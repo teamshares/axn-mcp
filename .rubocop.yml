@@ -1,0 +1,94 @@
+AllCops:
+  TargetRubyVersion: 3.2
+  NewCops: enable
+  SuggestExtensions: false
+
+# Standard for hyphenated gem names
+Naming/FileName:
+  Exclude:
+    - "lib/axn-mcp.rb"
+
+Style/MultilineBlockChain:
+  Enabled: false
+
+Style/SingleLineMethods:
+  Enabled: false
+
+Style/StringLiterals:
+  Enabled: true
+  EnforcedStyle: double_quotes
+
+Style/StringLiteralsInInterpolation:
+  Enabled: true
+  EnforcedStyle: double_quotes
+
+Style/Documentation:
+  Enabled: false
+
+Style/TrailingCommaInArguments:
+  EnforcedStyleForMultiline: comma
+
+Style/TrailingCommaInArrayLiteral:
+  EnforcedStyleForMultiline: comma
+
+Style/TrailingCommaInHashLiteral:
+  EnforcedStyleForMultiline: comma
+
+Style/HashSyntax:
+  EnforcedShorthandSyntax: always
+
+Naming/MemoizedInstanceVariableName:
+  Enabled: false
+
+Style/ClassAndModuleChildren:
+  Enabled: false
+
+Style/DoubleNegation:
+  Enabled: false
+
+Naming/MethodParameterName:
+  AllowedNames: e, on, id, if, as
+
+Metrics/BlockLength:
+  Max: 50
+  Exclude:
+    - 'spec/**/*'
+    - '*.gemspec'
+
+Metrics/ClassLength:
+  Max: 150
+
+# SchemaBuilder.json_type_for has complex type inference logic by design
+Metrics/MethodLength:
+  Max: 30
+  Exclude:
+    - "lib/axn/mcp/schema_builder.rb"
+
+Layout/LineLength:
+  Max: 160
+
+Naming/VariableNumber:
+  Exclude:
+    - 'spec/**/*'
+
+Metrics/PerceivedComplexity:
+  Max: 20
+  Exclude:
+    - "lib/axn/mcp/schema_builder.rb"
+
+Metrics/AbcSize:
+  Max: 32
+  Exclude:
+    - "lib/axn/mcp/schema_builder.rb"
+
+Metrics/CyclomaticComplexity:
+  Max: 20
+  Exclude:
+    - "lib/axn/mcp/schema_builder.rb"
+
+Metrics/ParameterLists:
+  Max: 10
+
+Metrics/ModuleLength:
+  Exclude:
+    - "lib/axn/mcp/schema_builder.rb"
