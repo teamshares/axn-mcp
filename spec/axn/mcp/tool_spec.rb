@@ -48,6 +48,36 @@ RSpec.describe Axn::MCP::Tool do
         expect(response.structured_content).to eq({ "greeting" => "Hello, Alice!" })
       end
 
+      it "uses JSON of structured content for text when tool has exposes (default :structured)" do
+        tool = Class.new(described_class) do
+          expects :name, type: String
+          exposes :greeting, type: String
+
+          def call
+            expose greeting: "Hello, #{name}!"
+          end
+        end
+
+        response = tool.call(name: "Alice", server_context:)
+        expect(response.content.first[:text]).to eq('{"greeting":"Hello, Alice!"}')
+      end
+
+      it "uses result.success for text when mcp_text_content :message" do
+        tool = Class.new(described_class) do
+          mcp_text_content :message
+          exposes :greeting, type: String
+          success "Custom success message"
+
+          def call
+            expose greeting: "Hello!"
+          end
+        end
+
+        response = tool.call(server_context:)
+        expect(response.content.first[:text]).to eq("Custom success message")
+        expect(response.structured_content).to eq({ "greeting" => "Hello!" })
+      end
+
       it "serializes complex objects in structured_content" do
         tool = Class.new(described_class) do
           exposes :data, type: Hash
@@ -460,6 +490,87 @@ RSpec.describe Axn::MCP::Tool do
       schema = tool.input_schema.to_h
       expect(schema[:properties]).to have_key(:name)
       expect(schema[:properties][:age][:type]).to eq("integer")
+    end
+  end
+
+  describe "mcp_text_content" do
+    it "raises ArgumentError for invalid value" do
+      expect do
+        Class.new(described_class) do
+          mcp_text_content :invalid
+
+          def call
+            # no-op
+          end
+        end
+      end.to raise_error(ArgumentError, /mcp_text_content must be one of/)
+    end
+
+    context "central config" do
+      around do |example|
+        original = Axn::MCP.config.mcp_text_content
+        Axn::MCP.config.mcp_text_content = :message
+        example.run
+      ensure
+        Axn::MCP.config.mcp_text_content = original
+      end
+
+      it "uses config default when tool does not set mcp_text_content" do
+        tool = Class.new(described_class) do
+          exposes :greeting, type: String
+          success "Tool message"
+
+          def call
+            expose greeting: "Hi"
+          end
+        end
+
+        response = tool.call(server_context:)
+        expect(response.content.first[:text]).to eq("Tool message")
+      end
+    end
+
+    context "per-tool overrides config" do
+      around do |example|
+        original = Axn::MCP.config.mcp_text_content
+        Axn::MCP.config.mcp_text_content = :message
+        example.run
+      ensure
+        Axn::MCP.config.mcp_text_content = original
+      end
+
+      it "per-tool :structured overrides config :message" do
+        tool = Class.new(described_class) do
+          mcp_text_content :structured
+          exposes :greeting, type: String
+          success "Ignored"
+
+          def call
+            expose greeting: "Hi"
+          end
+        end
+
+        response = tool.call(server_context:)
+        expect(response.content.first[:text]).to eq('{"greeting":"Hi"}')
+      end
+
+      it "per-tool :message overrides config :structured" do
+        # In this example only, override the around block so config is :structured (default)
+        Axn::MCP.config.mcp_text_content = :structured
+
+        tool = Class.new(described_class) do
+          mcp_text_content :message
+          exposes :greeting, type: String
+          success "Custom"
+
+          def call
+            expose greeting: "Hi"
+          end
+        end
+
+        response = tool.call(server_context:)
+        expect(response.content.first[:text]).to eq("Custom")
+      end
     end
   end
 
