@@ -10,6 +10,23 @@ module Axn
       class << self
         NOT_SET = Object.new.freeze
 
+        def mcp_text_content(value = NOT_SET)
+          if value == NOT_SET
+            resolved_mcp_text_content
+          else
+            Config.validate_mcp_text_content!(value)
+            @mcp_text_content = value
+          end
+        end
+
+        def resolved_mcp_text_content
+          if instance_variable_defined?(:@mcp_text_content) && !@mcp_text_content.nil?
+            @mcp_text_content
+          else
+            Axn::MCP.config.mcp_text_content
+          end
+        end
+
         def input_schema(value = NOT_SET)
           if value != NOT_SET
             super
@@ -61,7 +78,7 @@ module Axn
           # - Absent: called directly as Axn, return Axn::Result
           return result unless kwargs.key?(:server_context)
 
-          Serializer.result_to_mcp_response(result, external_field_configs)
+          Serializer.result_to_mcp_response(result, external_field_configs, text_content: resolved_mcp_text_content)
         end
 
         def call!(**)
@@ -107,7 +124,7 @@ module Axn
         end
 
         # Factory-style tool definition for quick one-off tools
-        def define(description:, expects: [], exposes: [], annotations: nil, **_opts, &block)
+        def define(description:, expects: [], exposes: [], annotations: nil, mcp_text_content: NOT_SET, **_opts, &block)
           tool_class = Class.new(self) do
             include Axn unless self < Axn
           end
@@ -122,6 +139,7 @@ module Axn
 
           tool_class.description(description)
           tool_class.annotations(annotations) if annotations
+          tool_class.mcp_text_content(mcp_text_content) if mcp_text_content != NOT_SET
 
           tool_class.define_method(:call, &block) if block
 

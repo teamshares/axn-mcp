@@ -66,7 +66,7 @@ RSpec.describe "MCP Server Integration", type: :integration do
 
       result = response[:result]
       expect(result[:isError]).to be_falsey
-      expect(result[:content].first[:text]).to include("completed successfully")
+      expect(result[:content].first[:text]).to eq('{"greeting":"Hello, Alice!"}')
       expect(result[:structuredContent]).to eq({ greeting: "Hello, Alice!" })
     end
   end
@@ -237,6 +237,83 @@ RSpec.describe "MCP Server Integration", type: :integration do
     end
   end
 
+  describe "mcp_text_content config and per-tool" do
+    context "central config sets default to :message" do
+      around do |example|
+        original = Axn::MCP.config.mcp_text_content
+        Axn::MCP.config.mcp_text_content = :message
+        example.run
+      ensure
+        Axn::MCP.config.mcp_text_content = original
+      end
+
+      let(:structured_tool) do
+        Class.new(Axn::MCP::Tool) do
+          def self.name
+            "StructuredTool"
+          end
+
+          description "Returns structured data"
+          exposes :value, type: Integer
+          success "Success message"
+
+          def call
+            expose value: 99
+          end
+        end
+      end
+
+      let(:tools) { [structured_tool] }
+
+      it "uses success message in response when config is :message and tool has no override" do
+        request = json_rpc_request("tools/call", { name: "structured_tool", arguments: {} })
+        response = parse_response(server.handle_json(request))
+
+        result = response[:result]
+        expect(result[:content].first[:text]).to eq("Success message")
+        expect(result[:structuredContent]).to eq({ value: 99 })
+      end
+    end
+
+    context "per-tool overrides config" do
+      around do |example|
+        original = Axn::MCP.config.mcp_text_content
+        Axn::MCP.config.mcp_text_content = :message
+        example.run
+      ensure
+        Axn::MCP.config.mcp_text_content = original
+      end
+
+      let(:override_tool) do
+        Class.new(Axn::MCP::Tool) do
+          def self.name
+            "OverrideTool"
+          end
+
+          mcp_text_content :structured
+          description "Overrides to structured text"
+          exposes :x, type: Integer
+          success "Ignored"
+
+          def call
+            expose x: 1
+          end
+        end
+      end
+
+      let(:tools) { [override_tool] }
+
+      it "per-tool :structured wins over config :message" do
+        request = json_rpc_request("tools/call", { name: "override_tool", arguments: {} })
+        response = parse_response(server.handle_json(request))
+
+        result = response[:result]
+        expect(result[:content].first[:text]).to eq('{"x":1}')
+        expect(result[:structuredContent]).to eq({ x: 1 })
+      end
+    end
+  end
+
   describe "factory-defined tool" do
     let(:factory_tool) do
       Axn::MCP::Tool.define(
@@ -262,6 +339,18 @@ RSpec.describe "MCP Server Integration", type: :integration do
       call_response = parse_response(server.handle_json(request))
 
       expect(call_response[:result][:structuredContent]).to eq({ count: 5 })
+    end
+
+    it "supports mcp_text_content in define options" do
+      message_tool = Axn::MCP::Tool.define(
+        description: "Returns message",
+        exposes: { value: { type: Integer } },
+        mcp_text_content: :message,
+      ) do
+        expose value: 10
+      end
+      # When mcp_text_content is :message we use result.success; without success() DSL that may be default Axn message
+      expect(message_tool.resolved_mcp_text_content).to eq(:message)
     end
   end
 end
