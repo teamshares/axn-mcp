@@ -5,7 +5,7 @@ module Axn
     class Tool < ::MCP::Tool
       include Axn
 
-      expects :server_context, type: Hash, optional: true, description: "MCP server context (injected automatically)"
+      expects :server_context, optional: true, description: "MCP server context (injected automatically)"
 
       class << self
         NOT_SET = Object.new.freeze
