@@ -174,7 +174,9 @@ RSpec.describe Axn::MCP::SchemaBuilder do
     end
 
     describe "descriptions" do
-      it "includes description from metadata" do
+      # Pass description: directly as a kwarg — NOT metadata: { description: "..." }.
+      # The metadata: hash is not a recognized key and raises ArgumentError.
+      it "includes description: kwarg in schema" do
         tool = Class.new(Axn::MCP::Tool) do
           expects :name, type: String, description: "The user's full name"
         end
@@ -188,6 +190,14 @@ RSpec.describe Axn::MCP::SchemaBuilder do
         end
         schema = described_class.build_input(tool.internal_field_configs)
         expect(schema[:properties][:name]).not_to have_key(:description)
+      end
+
+      it "raises ArgumentError when metadata: hash is passed instead of description: kwarg" do
+        expect do
+          Class.new(Axn::MCP::Tool) do
+            expects :name, type: String, metadata: { description: "The user's full name" }
+          end
+        end.to raise_error(ArgumentError, /metadata/)
       end
     end
 
