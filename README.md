@@ -61,6 +61,17 @@ class CreateNote < Axn::MCP::Tool
 end
 ```
 
+### Field Descriptions
+
+Use `description:` directly as a kwarg on `expects` and `exposes`:
+
+```ruby
+expects :start_date, type: Date, optional: true, description: "Inclusive lower bound (YYYY-MM-DD)"
+exposes :results,    type: Array,                description: "Matching records"
+```
+
+> **Note:** Do *not* wrap it in `metadata: { description: ... }`. The `metadata:` key is not recognized by `expects`/`exposes` and raises `ArgumentError` at class load time.
+
 ### Type Mappings
 
 Axn types map to JSON Schema types:
