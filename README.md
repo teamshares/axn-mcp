@@ -92,7 +92,7 @@ Axn types map to JSON Schema types:
 
 ### Typed member contracts with `shape:`
 
-Add a `shape:` block to any structured field (`Hash`, `Array`, or a `Data.define` class) to declare types and validations for its members. `required` is derived automatically; unannotated members on a `Data.define` type appear as bare `{}`. The block syntax is the same on both `expects` and `exposes`.
+Add a `shape:` block to a `Hash` or `Data.define` field to declare types and validations for its members. `required` is derived automatically; unannotated members on a `Data.define` type appear as bare `{}`. The block syntax is the same on both `expects` and `exposes`. (For `Array` fields, combine `shape:` with `of:` — see the next section.)
 
 **Hash field:**
 
