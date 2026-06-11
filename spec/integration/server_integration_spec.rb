@@ -2,6 +2,10 @@
 
 require "json"
 
+# Defined at top-level so it is accessible across describe blocks without
+# triggering Lint/ConstantDefinitionInBlock.
+IntegrationRecord = Data.define(:source, :provider_name, :active, :status)
+
 RSpec.describe "MCP Server Integration", type: :integration do
   let(:server) do
     MCP::Server.new(
@@ -351,6 +355,61 @@ RSpec.describe "MCP Server Integration", type: :integration do
       end
       # When mcp_text_content is :message we use result.success; without success() DSL that may be default Axn message
       expect(message_tool.resolved_mcp_text_content).to eq(:message)
+    end
+  end
+
+  describe "of:/shape: items schema — end-to-end" do
+    let(:list_tool) do
+      Class.new(Axn::MCP::Tool) do
+        def self.name
+          "ListIntegrationsTool"
+        end
+
+        description "List company integrations"
+
+        exposes :integrations, type: Array, of: IntegrationRecord do
+          field :source, type: String
+          field :status, type: String, inclusion: { in: %w[connected error needs_reconnect] }
+          field :active, type: :boolean, optional: true
+        end
+
+        def call
+          expose integrations: []
+        end
+      end
+    end
+
+    it "emits items in output_schema" do
+      items = list_tool.output_schema.to_h[:properties][:integrations][:items]
+      expect(items[:type]).to eq("object")
+    end
+
+    it "includes typed member properties in items" do
+      items = list_tool.output_schema.to_h[:properties][:integrations][:items]
+      expect(items[:properties][:source][:type]).to eq("string")
+    end
+
+    it "includes enum from inclusion: in items.properties" do
+      items = list_tool.output_schema.to_h[:properties][:integrations][:items]
+      expect(items[:properties][:status][:enum]).to eq(%w[connected error needs_reconnect])
+    end
+
+    it "preserves bare {} for unannotated Data members" do
+      items = list_tool.output_schema.to_h[:properties][:integrations][:items]
+      expect(items[:properties][:provider_name]).to eq({})
+    end
+
+    it "derives required from required members (optional: true excluded)" do
+      items = list_tool.output_schema.to_h[:properties][:integrations][:items]
+      expect(items[:required]).to include("source", "status")
+      expect(items[:required]).not_to include("active")
+    end
+
+    it "surfaces items through Tool.to_h outputSchema" do
+      tool_hash = list_tool.to_h
+      items = tool_hash[:outputSchema][:properties][:integrations][:items]
+      expect(items[:type]).to eq("object")
+      expect(items[:properties][:status][:enum]).to eq(%w[connected error needs_reconnect])
     end
   end
 end

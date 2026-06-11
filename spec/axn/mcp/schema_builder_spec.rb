@@ -420,4 +420,278 @@ RSpec.describe Axn::MCP::SchemaBuilder do
       expect(schema[:required]).not_to include("optional_field")
     end
   end
+
+  describe "of: array element schema" do
+    # scalar forms — both expects and exposes
+    {
+      String => { type: "string" },
+      Integer => { type: "integer" },
+      Float => { type: "number" },
+      Numeric => { type: "number" },
+    }.each do |ruby_type, expected_items|
+      it "emits items #{expected_items.inspect} for of: #{ruby_type} on expects" do
+        tool = Class.new(Axn::MCP::Tool) do
+          expects :tags, type: Array, of: ruby_type
+        end
+        schema = described_class.build_input(tool.internal_field_configs)
+        expect(schema[:properties][:tags][:items]).to eq(expected_items)
+      end
+
+      it "emits items #{expected_items.inspect} for of: #{ruby_type} on exposes" do
+        tool = Class.new(Axn::MCP::Tool) do
+          exposes :tags, type: Array, of: ruby_type
+        end
+        schema = described_class.build_output(tool.external_field_configs)
+        expect(schema[:properties][:tags][:items]).to eq(expected_items)
+      end
+    end
+
+    it "emits items { type: 'boolean' } for of: :boolean" do
+      tool = Class.new(Axn::MCP::Tool) do
+        exposes :flags, type: Array, of: :boolean
+      end
+      schema = described_class.build_output(tool.external_field_configs)
+      expect(schema[:properties][:flags][:items]).to eq({ type: "boolean" })
+    end
+
+    it "emits items { type: 'string', format: 'uuid' } for of: :uuid" do
+      tool = Class.new(Axn::MCP::Tool) do
+        exposes :ids, type: Array, of: :uuid
+      end
+      schema = described_class.build_output(tool.external_field_configs)
+      expect(schema[:properties][:ids][:items]).to eq({ type: "string", format: "uuid" })
+    end
+
+    it "emits items { anyOf: [...] } for a union of: [String, Numeric]" do
+      tool = Class.new(Axn::MCP::Tool) do
+        exposes :values, type: Array, of: [String, Numeric]
+      end
+      schema = described_class.build_output(tool.external_field_configs)
+      expect(schema[:properties][:values][:items]).to eq({
+                                                           anyOf: [{ type: "string" }, { type: "number" }],
+                                                         })
+    end
+
+    it "emits items with bare member properties for of: <Data.define subclass>" do
+      record_klass = Data.define(:source, :status, :active)
+      tool = Class.new(Axn::MCP::Tool) do
+        exposes :records, type: Array, of: record_klass
+      end
+      schema = described_class.build_output(tool.external_field_configs)
+      items = schema[:properties][:records][:items]
+      expect(items[:type]).to eq("object")
+      expect(items[:properties].keys).to contain_exactly(:source, :status, :active)
+      expect(items[:properties][:source]).to eq({})
+    end
+
+    it "does not emit items for plain Array without of:" do
+      tool = Class.new(Axn::MCP::Tool) do
+        exposes :things, type: Array
+      end
+      schema = described_class.build_output(tool.external_field_configs)
+      expect(schema[:properties][:things]).not_to have_key(:items)
+    end
+
+    it "still emits default: on non-member (FieldConfig) fields" do
+      tool = Class.new(Axn::MCP::Tool) do
+        expects :status, type: String, default: "pending"
+      end
+      schema = described_class.build_input(tool.internal_field_configs)
+      expect(schema[:properties][:status][:default]).to eq("pending")
+    end
+  end
+
+  describe "shape: block schema" do
+    describe "Array field with shape: block (no of:)" do
+      it "emits items.properties with typed members" do
+        tool = Class.new(Axn::MCP::Tool) do
+          exposes :entries, type: Array do
+            field :name, type: String
+            field :count, type: Integer
+          end
+        end
+        schema = described_class.build_output(tool.external_field_configs)
+        items = schema[:properties][:entries][:items]
+        expect(items[:type]).to eq("object")
+        expect(items[:properties][:name][:type]).to eq("string")
+        expect(items[:properties][:count][:type]).to eq("integer")
+      end
+
+      it "derives items.required from required members" do
+        tool = Class.new(Axn::MCP::Tool) do
+          exposes :entries, type: Array do
+            field :name, type: String
+            field :label, type: String, optional: true
+          end
+        end
+        schema = described_class.build_output(tool.external_field_configs)
+        items = schema[:properties][:entries][:items]
+        expect(items[:required]).to include("name")
+        expect(items[:required]).not_to include("label")
+      end
+
+      it "omits items.required when all members are optional" do
+        tool = Class.new(Axn::MCP::Tool) do
+          exposes :entries, type: Array do
+            field :name, type: String, optional: true
+          end
+        end
+        schema = described_class.build_output(tool.external_field_configs)
+        items = schema[:properties][:entries][:items]
+        expect(items).not_to have_key(:required)
+      end
+
+      it "includes enum in member property from inclusion:" do
+        tool = Class.new(Axn::MCP::Tool) do
+          exposes :entries, type: Array do
+            field :status, type: String, inclusion: { in: %w[active inactive] }
+          end
+        end
+        schema = described_class.build_output(tool.external_field_configs)
+        items = schema[:properties][:entries][:items]
+        expect(items[:properties][:status][:enum]).to eq(%w[active inactive])
+        expect(items[:properties][:status][:type]).to eq("string")
+      end
+
+      it "works on expects (input) as well as exposes (output)" do
+        tool = Class.new(Axn::MCP::Tool) do
+          expects :filters, type: Array do
+            field :key, type: String
+            field :value, type: String
+          end
+        end
+        schema = described_class.build_input(tool.internal_field_configs)
+        items = schema[:properties][:filters][:items]
+        expect(items[:type]).to eq("object")
+        expect(items[:properties][:key][:type]).to eq("string")
+        expect(items[:properties][:value][:type]).to eq("string")
+      end
+    end
+
+    describe "Hash field with shape: block" do
+      it "emits properties directly on the Hash property" do
+        tool = Class.new(Axn::MCP::Tool) do
+          exposes :config, type: Hash do
+            field :region, type: String
+            field :timeout, type: Integer
+          end
+        end
+        schema = described_class.build_output(tool.external_field_configs)
+        prop = schema[:properties][:config]
+        expect(prop[:type]).to eq("object")
+        expect(prop[:properties][:region][:type]).to eq("string")
+        expect(prop[:properties][:timeout][:type]).to eq("integer")
+      end
+
+      it "derives required from required Hash members" do
+        tool = Class.new(Axn::MCP::Tool) do
+          exposes :config, type: Hash do
+            field :region, type: String
+            field :label, type: String, optional: true
+          end
+        end
+        schema = described_class.build_output(tool.external_field_configs)
+        prop = schema[:properties][:config]
+        expect(prop[:required]).to include("region")
+        expect(prop[:required]).not_to include("label")
+      end
+    end
+
+    describe "Data.define subclass field with shape: block" do
+      let(:record_klass) { Data.define(:source, :provider_name, :active, :status) }
+
+      it "uses Data members as bare baseline so unannotated members still appear" do
+        klass = record_klass
+        tool = Class.new(Axn::MCP::Tool) do
+          exposes :integration, type: klass do
+            field :status, type: String, inclusion: { in: %w[connected error] }
+          end
+        end
+        schema = described_class.build_output(tool.external_field_configs)
+        prop = schema[:properties][:integration]
+        expect(prop[:properties][:status][:enum]).to eq(%w[connected error])
+        expect(prop[:properties][:source]).to eq({})
+        expect(prop[:properties][:provider_name]).to eq({})
+        expect(prop[:properties][:active]).to eq({})
+      end
+
+      it "includes all Data members even when only some are annotated" do
+        klass = record_klass
+        tool = Class.new(Axn::MCP::Tool) do
+          exposes :integration, type: klass do
+            field :status, type: String
+          end
+        end
+        schema = described_class.build_output(tool.external_field_configs)
+        expect(schema[:properties][:integration][:properties].keys)
+          .to contain_exactly(:source, :provider_name, :active, :status)
+      end
+    end
+
+    describe "nested shape blocks" do
+      it "recurses into nested Hash member" do
+        tool = Class.new(Axn::MCP::Tool) do
+          exposes :entries, type: Array do
+            field :name, type: String
+            field :config, type: Hash do
+              field :region, type: String
+            end
+          end
+        end
+        schema = described_class.build_output(tool.external_field_configs)
+        items = schema[:properties][:entries][:items]
+        expect(items[:properties][:config][:type]).to eq("object")
+        expect(items[:properties][:config][:properties][:region][:type]).to eq("string")
+      end
+    end
+
+    describe "of: + shape: (enrich case)" do
+      let(:record_klass) { Data.define(:source, :status, :active) }
+
+      it "starts from Data members as bare baseline and overlays block members" do
+        klass = record_klass
+        tool = Class.new(Axn::MCP::Tool) do
+          exposes :records, type: Array, of: klass do
+            field :status, type: String, inclusion: { in: %w[on off] }
+          end
+        end
+        schema = described_class.build_output(tool.external_field_configs)
+        items = schema[:properties][:records][:items]
+
+        expect(items[:type]).to eq("object")
+        # annotated member is typed
+        expect(items[:properties][:status][:type]).to eq("string")
+        expect(items[:properties][:status][:enum]).to eq(%w[on off])
+        # unannotated Data members stay bare {}
+        expect(items[:properties][:source]).to eq({})
+        expect(items[:properties][:active]).to eq({})
+      end
+
+      it "includes all Data members even when only some are annotated in shape:" do
+        klass = record_klass
+        tool = Class.new(Axn::MCP::Tool) do
+          exposes :records, type: Array, of: klass do
+            field :source, type: String
+          end
+        end
+        schema = described_class.build_output(tool.external_field_configs)
+        items = schema[:properties][:records][:items]
+        expect(items[:properties].keys).to include(:source, :status, :active)
+      end
+
+      it "also works on expects (input) with of: + shape: enrich" do
+        klass = record_klass
+        tool = Class.new(Axn::MCP::Tool) do
+          expects :records, type: Array, of: klass do
+            field :status, type: String, inclusion: { in: %w[on off] }
+          end
+        end
+        schema = described_class.build_input(tool.internal_field_configs)
+        items = schema[:properties][:records][:items]
+        expect(items[:properties][:status][:enum]).to eq(%w[on off])
+        expect(items[:properties][:source]).to eq({})
+        expect(items[:properties][:active]).to eq({})
+      end
+    end
+  end
 end
