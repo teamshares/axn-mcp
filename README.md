@@ -90,6 +90,109 @@ Axn types map to JSON Schema types:
 | `DateTime`, `Time` | `string` (format: `date-time`) |
 
 
+### Typed Array Elements with `of:` and `shape:`
+
+When an `Array` field carries an `of:` declaration, the generated JSON Schema includes a machine-readable `items:` entry rather than a bare `array` type.
+
+**Scalar element type:**
+
+```ruby
+exposes :tags, type: Array, of: String
+```
+
+```json
+{ "type": "array", "items": { "type": "string" } }
+```
+
+**`Data.define` struct (bare member names):**
+
+```ruby
+IntegrationRecord = Data.define(:source, :provider_name, :active, :status)
+
+exposes :integrations, type: Array, of: IntegrationRecord
+```
+
+```json
+{
+  "type": "array",
+  "items": {
+    "type": "object",
+    "properties": { "source": {}, "provider_name": {}, "active": {}, "status": {} }
+  }
+}
+```
+
+**`shape:` block — typed member contracts:**
+
+Add a `shape:` block to declare types (and validations) for each member. The block syntax is the same on both `expects` and `exposes`:
+
+```ruby
+exposes :integrations, type: Array, of: IntegrationRecord do
+  field :source, type: String
+  field :status, type: String, inclusion: { in: %w[connected error needs_reconnect] }
+  field :active, type: :boolean, optional: true
+end
+```
+
+```json
+{
+  "type": "array",
+  "items": {
+    "type": "object",
+    "required": ["source", "status"],
+    "properties": {
+      "source":       { "type": "string" },
+      "status":       { "type": "string", "enum": ["connected", "error", "needs_reconnect"] },
+      "active":       { "type": "boolean" },
+      "provider_name": {}
+    }
+  }
+}
+```
+
+Members declared in the block are fully typed. Members present on the `Data.define` struct but not annotated in the block remain as bare `{}`. The `required` array is derived from which members are non-optional.
+
+**`shape:` without `of:` (Hash or plain Array):**
+
+```ruby
+exposes :config, type: Hash do
+  field :region,  type: String
+  field :timeout, type: Integer, optional: true
+end
+```
+
+```json
+{
+  "type": "object",
+  "required": ["region"],
+  "properties": {
+    "region":  { "type": "string" },
+    "timeout": { "type": "integer" }
+  }
+}
+```
+
+Nested `shape:` blocks recurse naturally:
+
+```ruby
+exposes :entries, type: Array do
+  field :name,   type: String
+  field :config, type: Hash do
+    field :region, type: String
+  end
+end
+```
+
+**Union element types:**
+
+```ruby
+exposes :values, type: Array, of: [String, Numeric]
+```
+
+```json
+{ "type": "array", "items": { "anyOf": [{ "type": "string" }, { "type": "number" }] } }
+```
+
 ### ActiveRecord Model Fields
 
 When using `model: true`, the schema automatically generates an `_id` field with an appropriate description:
@@ -291,7 +394,7 @@ By default, successful responses contain a text block with the JSON-serialized `
 ## Requirements
 
 - Ruby >= 3.2.1
-- [axn](https://github.com/teamshares/axn) >= 0.1.0-alpha.4.1
+- [axn](https://github.com/teamshares/axn) >= 0.1.0-alpha.4.3
 - [mcp](https://github.com/modelcontextprotocol/ruby-sdk) >= 0.4
 
 ## Development
