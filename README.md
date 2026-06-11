@@ -90,7 +90,66 @@ Axn types map to JSON Schema types:
 | `DateTime`, `Time` | `string` (format: `date-time`) |
 
 
-### Typed Array Elements with `of:` and `shape:`
+### Typed member contracts with `shape:`
+
+Add a `shape:` block to any structured field (`Hash`, `Array`, or a `Data.define` class) to declare types and validations for its members. `required` is derived automatically; unannotated members on a `Data.define` type appear as bare `{}`. The block syntax is the same on both `expects` and `exposes`.
+
+**Hash field:**
+
+```ruby
+exposes :config, type: Hash do
+  field :region,  type: String
+  field :timeout, type: Integer, optional: true
+end
+```
+
+```json
+{
+  "type": "object",
+  "required": ["region"],
+  "properties": {
+    "region":  { "type": "string" },
+    "timeout": { "type": "integer" }
+  }
+}
+```
+
+**`Data.define` struct:**
+
+```ruby
+IntegrationRecord = Data.define(:source, :provider_name, :active, :status)
+
+exposes :integration, type: IntegrationRecord do
+  field :status, type: String, inclusion: { in: %w[connected error needs_reconnect] }
+  field :active, type: :boolean, optional: true
+end
+```
+
+```json
+{
+  "type": "object",
+  "required": ["status"],
+  "properties": {
+    "status":        { "type": "string", "enum": ["connected", "error", "needs_reconnect"] },
+    "active":        { "type": "boolean" },
+    "source":        {},
+    "provider_name": {}
+  }
+}
+```
+
+Blocks recurse naturally for nested objects:
+
+```ruby
+exposes :config, type: Hash do
+  field :region,    type: String
+  field :retention, type: Hash do
+    field :days, type: Integer
+  end
+end
+```
+
+### Typed array elements with `of:`
 
 When an `Array` field carries an `of:` declaration, the generated JSON Schema includes a machine-readable `items:` entry rather than a bare `array` type.
 
@@ -104,11 +163,19 @@ exposes :tags, type: Array, of: String
 { "type": "array", "items": { "type": "string" } }
 ```
 
-**`Data.define` struct (bare member names):**
+Other supported forms: `of: Integer`, `of: :boolean`, `of: :uuid`, and union types:
 
 ```ruby
-IntegrationRecord = Data.define(:source, :provider_name, :active, :status)
+exposes :values, type: Array, of: [String, Numeric]
+```
 
+```json
+{ "type": "array", "items": { "anyOf": [{ "type": "string" }, { "type": "number" }] } }
+```
+
+**`Data.define` struct — bare member names as baseline:**
+
+```ruby
 exposes :integrations, type: Array, of: IntegrationRecord
 ```
 
@@ -122,9 +189,7 @@ exposes :integrations, type: Array, of: IntegrationRecord
 }
 ```
 
-**`shape:` block — typed member contracts:**
-
-Add a `shape:` block to declare types (and validations) for each member. The block syntax is the same on both `expects` and `exposes`:
+**Combine `of:` with a `shape:` block to annotate element members:**
 
 ```ruby
 exposes :integrations, type: Array, of: IntegrationRecord do
@@ -149,48 +214,7 @@ end
 }
 ```
 
-Members declared in the block are fully typed. Members present on the `Data.define` struct but not annotated in the block (here `source` and `provider_name`) remain as bare `{}`. The `required` array is derived from which members are non-optional.
-
-**`shape:` without `of:` (Hash or plain Array):**
-
-```ruby
-exposes :config, type: Hash do
-  field :region,  type: String
-  field :timeout, type: Integer, optional: true
-end
-```
-
-```json
-{
-  "type": "object",
-  "required": ["region"],
-  "properties": {
-    "region":  { "type": "string" },
-    "timeout": { "type": "integer" }
-  }
-}
-```
-
-Nested `shape:` blocks recurse naturally:
-
-```ruby
-exposes :entries, type: Array do
-  field :name,   type: String
-  field :config, type: Hash do
-    field :region, type: String
-  end
-end
-```
-
-**Union element types:**
-
-```ruby
-exposes :values, type: Array, of: [String, Numeric]
-```
-
-```json
-{ "type": "array", "items": { "anyOf": [{ "type": "string" }, { "type": "number" }] } }
-```
+Annotated members are fully typed; unannotated `Data.define` members (`source`, `provider_name`) remain as bare `{}`.
 
 ### ActiveRecord Model Fields
 

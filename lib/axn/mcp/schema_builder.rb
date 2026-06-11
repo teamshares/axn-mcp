@@ -116,9 +116,13 @@ module Axn
           end
           prop[:items] = items unless items.empty?
         elsif shape
-          # Hash / class field — shape: members are the object's own properties
+          # Hash / class field — shape: members are the object's own properties.
+          # If the field type is a Data.define subclass, use its members as the bare
+          # baseline so unannotated members still appear (same enrich logic as of:).
           member_props, required = member_properties(shape[:members], for_output:)
-          prop[:properties] = member_props
+          type_klass = config.validations.dig(:type, :klass)
+          base_props = type_klass.is_a?(Class) && type_klass < Data ? type_klass.members.to_h { |m| [m, {}] } : {}
+          prop[:properties] = base_props.merge(member_props)
           prop[:required] = required unless required.empty?
         end
       end

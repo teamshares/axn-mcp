@@ -597,6 +597,37 @@ RSpec.describe Axn::MCP::SchemaBuilder do
       end
     end
 
+    describe "Data.define subclass field with shape: block" do
+      let(:record_klass) { Data.define(:source, :provider_name, :active, :status) }
+
+      it "uses Data members as bare baseline so unannotated members still appear" do
+        klass = record_klass
+        tool = Class.new(Axn::MCP::Tool) do
+          exposes :integration, type: klass do
+            field :status, type: String, inclusion: { in: %w[connected error] }
+          end
+        end
+        schema = described_class.build_output(tool.external_field_configs)
+        prop = schema[:properties][:integration]
+        expect(prop[:properties][:status][:enum]).to eq(%w[connected error])
+        expect(prop[:properties][:source]).to eq({})
+        expect(prop[:properties][:provider_name]).to eq({})
+        expect(prop[:properties][:active]).to eq({})
+      end
+
+      it "includes all Data members even when only some are annotated" do
+        klass = record_klass
+        tool = Class.new(Axn::MCP::Tool) do
+          exposes :integration, type: klass do
+            field :status, type: String
+          end
+        end
+        schema = described_class.build_output(tool.external_field_configs)
+        expect(schema[:properties][:integration][:properties].keys)
+          .to contain_exactly(:source, :provider_name, :active, :status)
+      end
+    end
+
     describe "nested shape blocks" do
       it "recurses into nested Hash member" do
         tool = Class.new(Axn::MCP::Tool) do
