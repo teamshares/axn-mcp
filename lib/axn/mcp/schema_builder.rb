@@ -87,14 +87,70 @@ module Axn
         prop[:type] = type_info[:type] if type_info[:type]
         prop[:format] = type_info[:format] if type_info[:format]
 
-        prop[:default] = config.default unless config.default.nil?
+        prop[:default] = config.default if config.respond_to?(:default) && !config.default.nil?
 
         if (inclusion = config.validations[:inclusion])
           enum_values = inclusion[:in] || inclusion[:within] if inclusion.is_a?(Hash)
           prop[:enum] = enum_values if enum_values
         end
 
+        apply_structured_schema(prop, config, for_output:)
+
         prop
+      end
+
+      # Combine of: (bare element baseline) and shape: (typed member contracts) into
+      # items:/properties: schema. Precedence: shape: enriches/overrides of: baseline.
+      def apply_structured_schema(prop, config, for_output:)
+        of    = config.validations[:of]
+        shape = config.validations[:shape]
+        return unless of || shape
+
+        if prop[:type] == "array"
+          items = of ? items_schema_for(of, for_output:) : {}
+          if shape
+            member_props, required = member_properties(shape[:members], for_output:)
+            base_props = items[:properties] || {}
+            items = items.merge(type: "object", properties: base_props.merge(member_props))
+            items[:required] = required unless required.empty?
+          end
+          prop[:items] = items unless items.empty?
+        elsif shape
+          # Hash / class field — shape: members are the object's own properties
+          member_props, required = member_properties(shape[:members], for_output:)
+          prop[:properties] = member_props
+          prop[:required] = required unless required.empty?
+        end
+      end
+
+      # Build a JSON Schema items: value from the of: validation hash.
+      def items_schema_for(of_validations, for_output: false)
+        klasses = Array(of_validations[:klass])
+        if klasses.size == 1
+          single_items_schema(klasses.first, for_output:)
+        else
+          { anyOf: klasses.map { |k| single_items_schema(k, for_output:) } }
+        end
+      end
+
+      def single_items_schema(klass, for_output: false)
+        if klass.is_a?(Class) && klass < Data
+          # Data.define subclass → object with named (but untyped) properties as baseline
+          { type: "object", properties: klass.members.to_h { |m| [m, {}] } }
+        else
+          json_type_for({ type: klass }, for_output:)
+        end
+      end
+
+      # Build properties/required from a shape: block's members. Recurses for nested shape/of.
+      def member_properties(members, for_output:)
+        props = {}
+        required = []
+        members.each do |m|
+          props[m.field] = build_property(m, for_output:).compact
+          required << m.field.to_s unless optional?(m)
+        end
+        [props, required]
       end
 
       def build_model_property(config, properties, required)
