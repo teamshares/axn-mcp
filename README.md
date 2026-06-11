@@ -128,7 +128,6 @@ Add a `shape:` block to declare types (and validations) for each member. The blo
 
 ```ruby
 exposes :integrations, type: Array, of: IntegrationRecord do
-  field :source, type: String
   field :status, type: String, inclusion: { in: %w[connected error needs_reconnect] }
   field :active, type: :boolean, optional: true
 end
@@ -139,18 +138,18 @@ end
   "type": "array",
   "items": {
     "type": "object",
-    "required": ["source", "status"],
+    "required": ["status"],
     "properties": {
-      "source":       { "type": "string" },
-      "status":       { "type": "string", "enum": ["connected", "error", "needs_reconnect"] },
-      "active":       { "type": "boolean" },
+      "status":        { "type": "string", "enum": ["connected", "error", "needs_reconnect"] },
+      "active":        { "type": "boolean" },
+      "source":        {},
       "provider_name": {}
     }
   }
 }
 ```
 
-Members declared in the block are fully typed. Members present on the `Data.define` struct but not annotated in the block remain as bare `{}`. The `required` array is derived from which members are non-optional.
+Members declared in the block are fully typed. Members present on the `Data.define` struct but not annotated in the block (here `source` and `provider_name`) remain as bare `{}`. The `required` array is derived from which members are non-optional.
 
 **`shape:` without `of:` (Hash or plain Array):**
 
