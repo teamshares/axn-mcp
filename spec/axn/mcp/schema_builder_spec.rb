@@ -647,6 +647,20 @@ RSpec.describe Axn::MCP::SchemaBuilder do
         items = schema[:properties][:records][:items]
         expect(items[:properties].keys).to include(:source, :status, :active)
       end
+
+      it "also works on expects (input) with of: + shape: enrich" do
+        klass = record_klass
+        tool = Class.new(Axn::MCP::Tool) do
+          expects :records, type: Array, of: klass do
+            field :status, type: String, inclusion: { in: %w[on off] }
+          end
+        end
+        schema = described_class.build_input(tool.internal_field_configs)
+        items = schema[:properties][:records][:items]
+        expect(items[:properties][:status][:enum]).to eq(%w[on off])
+        expect(items[:properties][:source]).to eq({})
+        expect(items[:properties][:active]).to eq({})
+      end
     end
   end
 end

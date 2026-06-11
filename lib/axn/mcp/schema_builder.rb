@@ -94,14 +94,14 @@ module Axn
           prop[:enum] = enum_values if enum_values
         end
 
-        apply_structured_schema(prop, config, for_output:)
+        apply_structured_schema!(prop, config, for_output:)
 
         prop
       end
 
       # Combine of: (bare element baseline) and shape: (typed member contracts) into
       # items:/properties: schema. Precedence: shape: enriches/overrides of: baseline.
-      def apply_structured_schema(prop, config, for_output:)
+      def apply_structured_schema!(prop, config, for_output:)
         of    = config.validations[:of]
         shape = config.validations[:shape]
         return unless of || shape
