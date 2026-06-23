@@ -16,6 +16,9 @@ module Axn
   end
 end
 
+# Required after the module above extends Axn::Configurable, since Tool calls
+# Axn::MCP.overrides at class-definition time. (Setting declaration order is
+# free, but the extend must happen first.)
 require_relative "mcp/serializer"
 require_relative "mcp/schema_builder"
 require_relative "mcp/field_declarations"
