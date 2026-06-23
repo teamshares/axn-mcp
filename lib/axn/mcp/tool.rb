@@ -4,28 +4,12 @@ module Axn
   module MCP
     class Tool < ::MCP::Tool
       include Axn
+      include Axn::MCP.overrides
 
       expects :server_context, optional: true, description: "MCP server context (injected automatically)"
 
       class << self
         NOT_SET = Object.new.freeze
-
-        def mcp_text_content(value = NOT_SET)
-          if value == NOT_SET
-            resolved_mcp_text_content
-          else
-            Config.validate_mcp_text_content!(value)
-            @mcp_text_content = value
-          end
-        end
-
-        def resolved_mcp_text_content
-          if instance_variable_defined?(:@mcp_text_content) && !@mcp_text_content.nil?
-            @mcp_text_content
-          else
-            Axn::MCP.config.mcp_text_content
-          end
-        end
 
         def input_schema(value = NOT_SET)
           if value != NOT_SET
