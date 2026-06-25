@@ -4,8 +4,8 @@ source "https://rubygems.org"
 
 gemspec
 
-# PRO-2770: depend on the upstream Axn::Configurable DSL branch (PRO-2769) until released.
-gem "axn", github: "teamshares/axn", branch: "kali/pro-2769-axn-configuration-dsl-for-downstream-gem-consistency"
+# PRO-2770: track axn main now that the Axn::Configurable DSL (PRO-2769) is merged.
+gem "axn", github: "teamshares/axn", branch: "main"
 
 gem "rake", "~> 13.0"
 gem "rspec", "~> 3.0"
