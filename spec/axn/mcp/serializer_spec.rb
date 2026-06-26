@@ -147,14 +147,14 @@ RSpec.describe Axn::MCP::Serializer do
       it "uses result.error for text and sets error: true" do
         tool = Class.new(Axn::MCP::Tool) do
           def call
-            fail! "Something went wrong"
+            fail! "email taken"
           end
         end
         result = tool.call
 
         response = described_class.result_to_mcp_response(result, [], text_content: :structured)
 
-        expect(response.content.first[:text]).to eq("Something went wrong")
+        expect(response.content.first[:text]).to eq("Tool call failed: email taken")
         expect(response.error?).to be true
       end
     end

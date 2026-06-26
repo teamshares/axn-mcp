@@ -62,22 +62,22 @@ RSpec.describe "Direct Axn Invocation", type: :integration do
           description "A tool that fails"
 
           def call
-            fail! "Something went wrong"
+            fail! "email taken"
           end
         end
       end
 
-      it "returns failed Axn::Result via .call" do
+      it "returns failed Axn::Result via .call, with the reason prefixed by the base headline" do
         result = failing_tool.call
 
         expect(result).to be_a(Axn::Result)
         expect(result).not_to be_ok
         expect(result.exception).to be_a(Axn::Failure)
-        expect(result.message).to eq("Something went wrong")
+        expect(result.message).to eq("Tool call failed: email taken")
       end
 
-      it "raises Axn::Failure via .call!" do
-        expect { failing_tool.call! }.to raise_error(Axn::Failure, "Something went wrong")
+      it "raises Axn::Failure via .call! carrying the raw (unprefixed) reason" do
+        expect { failing_tool.call! }.to raise_error(Axn::Failure, "email taken")
       end
     end
 

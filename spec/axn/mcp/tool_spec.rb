@@ -96,19 +96,19 @@ RSpec.describe Axn::MCP::Tool do
     end
 
     describe "error response" do
-      it "returns error response when action fails" do
+      it "returns error response when action fails, prefixing the reason with the base headline" do
         tool = Class.new(described_class) do
           def call
-            fail! "Something went wrong"
+            fail! "email taken"
           end
         end
 
         response = tool.call(server_context:)
         expect(response.error?).to be true
-        expect(response.content.first[:text]).to eq("Something went wrong")
+        expect(response.content.first[:text]).to eq("Tool call failed: email taken")
       end
 
-      it "uses default error message when none provided" do
+      it "uses the base headline alone when no reason is provided" do
         tool = Class.new(described_class) do
           def call
             fail!
@@ -117,7 +117,7 @@ RSpec.describe Axn::MCP::Tool do
 
         response = tool.call(server_context:)
         expect(response.error?).to be true
-        expect(response.content.first[:text]).to be_present
+        expect(response.content.first[:text]).to eq("Tool call failed")
       end
     end
 
@@ -181,14 +181,14 @@ RSpec.describe Axn::MCP::Tool do
     it "returns failed Axn::Result on fail!" do
       tool = Class.new(described_class) do
         def call
-          fail! "Something went wrong"
+          fail! "email taken"
         end
       end
 
       result = tool.call
       expect(result).to be_a(Axn::Result)
       expect(result).not_to be_ok
-      expect(result.message).to eq("Something went wrong")
+      expect(result.message).to eq("Tool call failed: email taken")
     end
 
     it "returns failed Axn::Result on exception" do

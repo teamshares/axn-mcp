@@ -3,7 +3,8 @@
 ## 0.1.1
 
 - Migrated internal configuration off hand-rolled code onto the upstream `Axn::Configurable` DSL (added in axn PRO-2769). The public surface is unchanged: `Axn::MCP.config.mcp_text_content`, per-tool `mcp_text_content(...)` overrides, and `resolved_mcp_text_content` all behave as before.
-- Requires an `axn` version that ships `Axn::Configurable`.
+- `Axn::MCP::Tool` now declares a base `error "Tool call failed"` headline (leveraging axn's error-prefix feature). Failures with no explicit reason — validation errors, unexpected exceptions, bare `fail!` — now surface as `"Tool call failed"` instead of axn's generic `"Something went wrong"`, and explicit reasons are contextualized as `"Tool call failed: <reason>"`. Subclasses can override with their own base `error "..."`, or opt a single message out with `fail!("...", prefixed: false)`. The raw reason is still carried unprefixed on the raised `Axn::Failure` (so `call!` raises with the bare reason).
+- Requires an `axn` version that ships `Axn::Configurable` and base-`error` prefixing (axn PRO-2746 / PR #109).
 
 ## 0.1.0
 

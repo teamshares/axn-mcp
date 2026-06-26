@@ -112,20 +112,20 @@ RSpec.describe "MCP Server Integration", type: :integration do
         description "A tool that fails"
 
         def call
-          fail! "Something went wrong"
+          fail! "email taken"
         end
       end
     end
 
     let(:tools) { [failing_tool] }
 
-    it "returns error response for failed actions" do
+    it "returns error response for failed actions, prefixing the reason with the base headline" do
       request = json_rpc_request("tools/call", { name: "failing_tool", arguments: {} })
       response = parse_response(server.handle_json(request))
 
       result = response[:result]
       expect(result[:isError]).to be true
-      expect(result[:content].first[:text]).to eq("Something went wrong")
+      expect(result[:content].first[:text]).to eq("Tool call failed: email taken")
     end
   end
 
