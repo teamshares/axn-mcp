@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.1
+
+- Migrated internal configuration off hand-rolled code onto the upstream `Axn::Configurable` DSL (added in axn PRO-2769). The public surface is unchanged: `Axn::MCP.config.mcp_text_content`, per-tool `mcp_text_content(...)` overrides, and `resolved_mcp_text_content` all behave as before.
+- Requires an `axn` version that ships `Axn::Configurable`.
+
 ## 0.1.0
 
 - Initial release
