@@ -269,7 +269,7 @@ RSpec.describe Axn::MCP::Tool do
           end
         end
 
-        expect { tool.call! }.to raise_error(Axn::Failure, "Controlled failure")
+        expect { tool.call! }.to raise_error(Axn::Failure, "Tool call failed: Controlled failure")
       end
 
       it "raises the original exception on error" do

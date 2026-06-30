@@ -76,8 +76,8 @@ RSpec.describe "Direct Axn Invocation", type: :integration do
         expect(result.message).to eq("Tool call failed: email taken")
       end
 
-      it "raises Axn::Failure via .call! carrying the raw (unprefixed) reason" do
-        expect { failing_tool.call! }.to raise_error(Axn::Failure, "email taken")
+      it "raises Axn::Failure via .call! with #message matching result.error" do
+        expect { failing_tool.call! }.to raise_error(Axn::Failure, "Tool call failed: email taken")
       end
     end
 

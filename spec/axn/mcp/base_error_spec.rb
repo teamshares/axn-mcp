@@ -56,12 +56,12 @@ RSpec.describe "Axn::MCP::Tool base error headline" do
       expect(failure_text { def call = fail!("not found: user 5") }).to eq("Tool call failed: not found: user 5")
     end
 
-    it "honors prefixed: false to emit the raw reason" do
-      expect(failure_text { def call = fail!("Account is locked.", prefixed: false) }).to eq("Account is locked.")
+    it "honors standalone: true to emit the reason on its own" do
+      expect(failure_text { def call = fail!("Account is locked.", standalone: true) }).to eq("Account is locked.")
     end
   end
 
-  describe "raw vs. prefixed presentation" do
+  describe "presentation across .call / .call!" do
     let(:tool) { Class.new(Axn::MCP::Tool) { def call = fail!("email taken") } }
 
     it "exposes the prefixed presentation via result.error/#message" do
@@ -70,8 +70,8 @@ RSpec.describe "Axn::MCP::Tool base error headline" do
       expect(result.message).to eq("Tool call failed: email taken")
     end
 
-    it "raises the raw (unprefixed) reason on call!" do
-      expect { tool.call! }.to raise_error(Axn::Failure, "email taken")
+    it "raises with #message matching result.error on call! (Axn-owned exception)" do
+      expect { tool.call! }.to raise_error(Axn::Failure, "Tool call failed: email taken")
     end
   end
 

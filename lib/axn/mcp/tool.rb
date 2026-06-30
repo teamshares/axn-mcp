@@ -13,7 +13,7 @@ module Axn
       #      (validation errors, unexpected exceptions, bare `fail!`) -> "Tool call failed".
       #   2. Prefixes explicit `fail!("reason")` messages as "Tool call failed: reason".
       # Subclasses may override by declaring their own base `error "..."`, or opt a single message
-      # out with `fail!("...", prefixed: false)`.
+      # out with `fail!("...", standalone: true)`.
       error "Tool call failed"
 
       class << self
