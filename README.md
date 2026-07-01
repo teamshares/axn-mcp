@@ -381,16 +381,18 @@ def call
 end
 ```
 
-`Axn::MCP::Tool` declares a base `error "Tool call failed"` headline, so the text the LLM actually
-sees is:
+`Axn::MCP::Tool` declares a base failure headline (default `"Tool call failed"`), so the text the
+LLM actually sees is:
 
 | Failure                                  | Text shown to the LLM                |
 | ----------------------------------------- | ------------------------------------- |
 | `fail! "User not found"`                  | `"Tool call failed: User not found"`  |
 | Bare `fail!`, a validation error, or an unhandled exception | `"Tool call failed"`                  |
 
-Override the headline per tool by declaring your own base `error "..."` on the subclass, or opt a
-single message out of prefixing with `fail!("...", standalone: true)`.
+Change the headline **gem-wide** with `Axn::MCP.config.failure_headline = "Something broke"` — it's
+read fresh on every failure, so there's no reload or require-order gotcha. Override it **per tool**
+by declaring your own base `error "..."` on the subclass (which wins over the configured headline),
+or opt a single message out of prefixing with `fail!("...", standalone: true)`.
 
 Unhandled exceptions are also caught automatically. When an exception occurs:
 

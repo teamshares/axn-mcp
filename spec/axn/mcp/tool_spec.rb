@@ -582,6 +582,27 @@ RSpec.describe Axn::MCP::Tool do
     it "includes Axn module" do
       expect(described_class.ancestors).to include(Axn)
     end
+
+    it "resolves mcp_text_content up the full superclass chain, not just one level" do
+      middle = Class.new(described_class) { mcp_text_content :message }
+      grandchild = Class.new(middle)
+
+      expect(grandchild.resolved_mcp_text_content).to eq(:message)
+    end
+
+    it "falls back to library config when no ancestor in the chain has an override" do
+      middle = Class.new(described_class)
+      grandchild = Class.new(middle)
+
+      expect(grandchild.resolved_mcp_text_content).to eq(Axn::MCP.config.mcp_text_content)
+    end
+
+    it "lets a grandchild's own override win over an ancestor's" do
+      middle = Class.new(described_class) { mcp_text_content :message }
+      grandchild = Class.new(middle) { mcp_text_content :structured }
+
+      expect(grandchild.resolved_mcp_text_content).to eq(:structured)
+    end
   end
 
   describe ".input_schema_value" do

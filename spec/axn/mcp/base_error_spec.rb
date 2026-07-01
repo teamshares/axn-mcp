@@ -2,8 +2,9 @@
 
 require "spec_helper"
 
-# Pins down the exact failure strings produced by Axn::MCP::Tool's base `error "Tool call failed"`
-# headline across every failure mode, and guards against awkward prefix/suffix joining.
+# Pins down the exact failure strings produced by Axn::MCP::Tool's base error headline (default
+# "Tool call failed", configurable via Axn::MCP.config.failure_headline) across every failure mode,
+# and guards against awkward prefix/suffix joining.
 RSpec.describe "Axn::MCP::Tool base error headline" do
   # Resolve the failure presentation the way the serializer does (result.error), for an
   # anonymous tool whose #call body is the given block.
@@ -58,6 +59,39 @@ RSpec.describe "Axn::MCP::Tool base error headline" do
 
     it "honors standalone: true to emit the reason on its own" do
       expect(failure_text { def call = fail!("Account is locked.", standalone: true) }).to eq("Account is locked.")
+    end
+  end
+
+  describe "gem-wide configurability (Axn::MCP.config.failure_headline)" do
+    around do |example|
+      original = Axn::MCP.config.failure_headline
+      example.run
+    ensure
+      Axn::MCP.config.failure_headline = original
+    end
+
+    it "uses a reconfigured headline immediately, with no reload of the Tool class" do
+      tool = Class.new(Axn::MCP::Tool) { def call = fail!("email taken") }
+      expect(tool.call.error).to eq("Tool call failed: email taken")
+
+      Axn::MCP.config.failure_headline = "Something broke"
+
+      expect(tool.call.error).to eq("Something broke: email taken")
+    end
+
+    it "still lets a subclass's own base error win over the configured headline" do
+      Axn::MCP.config.failure_headline = "Something broke"
+      tool = Class.new(Axn::MCP::Tool) do
+        error "Couldn't sync user"
+        def call = fail!("email taken")
+      end
+
+      expect(tool.call.error).to eq("Couldn't sync user: email taken")
+    end
+
+    it "rejects a blank or non-String headline at assignment" do
+      expect { Axn::MCP.config.failure_headline = "" }.to raise_error(ArgumentError, /failure_headline/)
+      expect { Axn::MCP.config.failure_headline = nil }.to raise_error(ArgumentError, /failure_headline/)
     end
   end
 
