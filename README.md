@@ -381,13 +381,26 @@ def call
 end
 ```
 
+`Axn::MCP::Tool` declares a base `error "Tool call failed"` headline, so the text the LLM actually
+sees is:
+
+| Failure                                  | Text shown to the LLM                |
+| ----------------------------------------- | ------------------------------------- |
+| `fail! "User not found"`                  | `"Tool call failed: User not found"`  |
+| Bare `fail!`, a validation error, or an unhandled exception | `"Tool call failed"`                  |
+
+Override the headline per tool by declaring your own base `error "..."` on the subclass, or opt a
+single message out of prefixing with `fail!("...", standalone: true)`.
+
 Unhandled exceptions are also caught automatically. When an exception occurs:
 
 1. The error is recorded on the result
 2. Any configured `on_exception` handlers are triggered (see [Axn configuration](https://github.com/teamshares/axn))
 3. An `MCP::Tool::Response` is returned with `error: true`
 
-Both `fail!` calls and unhandled exceptions result in error responses to the LLM.
+Both `fail!` calls and unhandled exceptions result in error responses to the LLM. Calling a tool
+directly with `call!` raises `Axn::Failure` (or the original exception) with `#message` matching
+`result.error` — i.e. the same prefixed text.
 
 ## Integration with MCP Server
 
@@ -427,6 +440,9 @@ bundle install
 bundle exec rspec
 bundle exec rubocop
 ```
+
+Working on this gem with a coding agent? Read [`AGENTS.md`](AGENTS.md) first (`CLAUDE.md` is a
+symlink to it).
 
 ## License
 
