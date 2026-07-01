@@ -8,15 +8,15 @@ module Axn
 
       expects :server_context, optional: true, description: "MCP server context (injected automatically)"
 
-      # Base failure headline, read fresh from config on every failure (a block, not a literal, so
-      # Axn::MCP.config.failure_headline= takes effect immediately -- no reload/require-order gotcha).
+      # Base error headline, read fresh from config on every failure (a block, not a literal, so
+      # Axn::MCP.config.error_headline= takes effect immediately -- no reload/require-order gotcha).
       # Two coupled effects (see axn's Axn::Configurable error prefixing):
       #   1. Replaces axn's generic "Something went wrong" for failures with no explicit reason
       #      (validation errors, unexpected exceptions, bare `fail!`) -> the configured headline.
       #   2. Prefixes explicit `fail!("reason")` messages as "<headline>: reason".
-      # Gem-wide default: Axn::MCP.config.failure_headline = "...". Per-tool: declare a subclass's
+      # Gem-wide default: Axn::MCP.config.error_headline = "...". Per-tool: declare a subclass's
       # own base `error "..."`, or opt a single message out with `fail!("...", standalone: true)`.
-      error { Axn::MCP.config.failure_headline }
+      error { Axn::MCP.config.error_headline }
 
       class << self
         NOT_SET = Object.new.freeze

@@ -3,11 +3,11 @@
 RSpec.describe "Axn::MCP configuration" do
   around do |example|
     original_text_content = Axn::MCP.config.mcp_text_content
-    original_headline = Axn::MCP.config.failure_headline
+    original_headline = Axn::MCP.config.error_headline
     example.run
   ensure
     Axn::MCP.config.mcp_text_content = original_text_content
-    Axn::MCP.config.failure_headline = original_headline
+    Axn::MCP.config.error_headline = original_headline
   end
 
   describe "Axn::MCP.config.mcp_text_content=" do
@@ -34,22 +34,22 @@ RSpec.describe "Axn::MCP configuration" do
     end
   end
 
-  describe "Axn::MCP.config.failure_headline=" do
+  describe "Axn::MCP.config.error_headline=" do
     it "accepts a non-blank String" do
-      Axn::MCP.config.failure_headline = "Something broke"
-      expect(Axn::MCP.config.failure_headline).to eq("Something broke")
+      Axn::MCP.config.error_headline = "Something broke"
+      expect(Axn::MCP.config.error_headline).to eq("Something broke")
     end
 
     it "raises ArgumentError for a blank String" do
-      expect { Axn::MCP.config.failure_headline = "" }.to raise_error(ArgumentError, /failure_headline got invalid value/)
+      expect { Axn::MCP.config.error_headline = "" }.to raise_error(ArgumentError, /error_headline got invalid value/)
     end
 
     it "raises ArgumentError for nil" do
-      expect { Axn::MCP.config.failure_headline = nil }.to raise_error(ArgumentError, /failure_headline got invalid value/)
+      expect { Axn::MCP.config.error_headline = nil }.to raise_error(ArgumentError, /error_headline got invalid value/)
     end
 
     it "raises ArgumentError for a non-String" do
-      expect { Axn::MCP.config.failure_headline = :broken }.to raise_error(ArgumentError, /failure_headline got invalid value/)
+      expect { Axn::MCP.config.error_headline = :broken }.to raise_error(ArgumentError, /error_headline got invalid value/)
     end
   end
 
@@ -59,9 +59,9 @@ RSpec.describe "Axn::MCP configuration" do
       expect(Axn::MCP.config.mcp_text_content).to eq(:structured)
     end
 
-    it "defaults failure_headline to 'Tool call failed'" do
+    it "defaults error_headline to 'Tool call failed'" do
       Axn::MCP.reset_config!
-      expect(Axn::MCP.config.failure_headline).to eq("Tool call failed")
+      expect(Axn::MCP.config.error_headline).to eq("Tool call failed")
     end
   end
 end

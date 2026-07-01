@@ -13,7 +13,7 @@ module Axn
     class SchemaError < StandardError; end
 
     setting :mcp_text_content, default: :structured, one_of: %i[structured message], overridable: true
-    setting :failure_headline, default: "Tool call failed", validate: ->(v) { v.is_a?(String) && !v.strip.empty? }
+    setting :error_headline, default: "Tool call failed", validate: ->(v) { v.is_a?(String) && !v.strip.empty? }
   end
 end
 
