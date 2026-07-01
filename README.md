@@ -401,8 +401,9 @@ Unhandled exceptions are also caught automatically. When an exception occurs:
 3. An `MCP::Tool::Response` is returned with `error: true`
 
 Both `fail!` calls and unhandled exceptions result in error responses to the LLM. Calling a tool
-directly with `call!` raises `Axn::Failure` (or the original exception) with `#message` matching
-`result.error` — i.e. the same prefixed text.
+directly with `call!` on a `fail!` raises `Axn::Failure` whose `#message` matches `result.error` —
+i.e. the same prefixed text. For an unhandled exception, `call!` re-raises the *original* exception
+with its original `#message`, which is not the prefixed headline shown to the LLM via `result.error`.
 
 ## Integration with MCP Server
 
