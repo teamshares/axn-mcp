@@ -20,6 +20,24 @@ RSpec.describe Axn::MCP::Invocation do
       expect(JSON.parse(response.content.first[:text])["seen_context"]).to eq("user_id" => 1)
     end
 
+    it "still reads server_context when it arrives under a string key, not just a symbol key" do
+      axn_class = Class.new do
+        include Axn
+
+        expects :name, type: String
+        expects :server_context, on: :ambient_context, type: Object, optional: true
+        exposes :seen_context, type: Hash, optional: true
+
+        def call
+          expose seen_context: server_context
+        end
+      end
+
+      response = described_class.perform(axn_class, { "name" => "Alice", "server_context" => { user_id: 1 } }, text_content: :structured)
+
+      expect(JSON.parse(response.content.first[:text])["seen_context"]).to eq("user_id" => 1)
+    end
+
     it "passes ambient_context: nil explicitly (not omitted) when server_context is nil, so no Current default leaks in" do
       axn_class = Class.new do
         include Axn

@@ -13,7 +13,16 @@ module Axn
       # returns MCP::Tool::Response (never a raw Axn::Result), and it deliberately has no .call! --
       # MCP::Server itself only ever calls .call, and a consumer wanting real bang/raise-on-failure
       # semantics can call the original wrapped class's own .call! directly (unwrapped).
+      VALID_MCP_TEXT_CONTENT = %i[structured message].freeze
+
       def wrap(axn_class, description:, name: nil, annotations: nil, mcp_text_content: nil)
+        # Fail fast on a typo'd value (e.g. :mesage) rather than silently falling through to
+        # :structured -- matches the validation Axn::MCP.config.mcp_text_content=/Tool's
+        # mcp_text_content(...) setting already enforce (same error message shape).
+        if mcp_text_content && !VALID_MCP_TEXT_CONTENT.include?(mcp_text_content)
+          raise ArgumentError, "mcp_text_content must be one of #{VALID_MCP_TEXT_CONTENT.map(&:inspect).join(", ")}; got #{mcp_text_content.inspect}"
+        end
+
         Class.new(::MCP::Tool) do
           tool_name(name) if name
           description(description)

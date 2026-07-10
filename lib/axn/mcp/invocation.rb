@@ -11,7 +11,11 @@ module Axn
       module_function
 
       def perform(axn_class, kwargs, text_content:)
-        server_context = kwargs[:server_context]
+        # Read the Symbol key first (how every real caller -- Tool.call, MCP::Server, wrap -- sends
+        # it) but fall back to a String key so a forwarding layer that splats a parsed Hash without
+        # symbolizing first doesn't silently lose the real value (it would otherwise get stripped
+        # below as `rest`, with no reader here to have captured it first).
+        server_context = kwargs[:server_context] || kwargs["server_context"]
         # Strip :ambient_context too, not just :server_context, and strip BOTH keys under either
         # a Symbol or a String form: **rest is expanded after the trusted `ambient_context:`
         # literal below, so a caller-supplied `ambient_context:`/`"ambient_context"` kwarg (e.g.

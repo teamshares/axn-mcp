@@ -68,5 +68,11 @@ RSpec.describe "Axn::MCP.wrap" do
       message_response = tool.call(name: "Alice", server_context: {})
       expect(message_response.content.first[:text]).to eq("Action completed successfully")
     end
+
+    it "raises ArgumentError for an invalid mcp_text_content value, matching Axn::MCP.config's own validation" do
+      expect do
+        Axn::MCP.wrap(plain_axn, description: "Greets someone", mcp_text_content: :mesage)
+      end.to raise_error(ArgumentError, "mcp_text_content must be one of :structured, :message; got :mesage")
+    end
   end
 end
