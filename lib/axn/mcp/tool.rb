@@ -6,7 +6,8 @@ module Axn
       include Axn
       include Axn::MCP.overrides
 
-      expects :server_context, optional: true, description: "MCP server context (injected automatically)"
+      expects :server_context, on: :ambient_context, type: Hash, optional: true,
+                               description: "MCP server context (injected automatically)"
 
       # Base error headline, read fresh from config on every failure (a block, not a literal, so
       # Axn::MCP.config.error_headline= takes effect immediately -- no reload/require-order gotcha).
@@ -21,11 +22,6 @@ module Axn
       class << self
         NOT_SET = Object.new.freeze
 
-        # server_context is an axn-mcp convention (injected by the MCP server, never supplied by the
-        # client) -- not an axn-core concept, so core's Axn::Reflection::Schema (which only excludes
-        # its own :ambient_context) doesn't know to hide it. Filter it out here before reflecting.
-        EXCLUDED_FROM_INPUT_SCHEMA = %i[server_context].freeze
-
         def input_schema(value = NOT_SET)
           if value != NOT_SET
             # Explicit-arg super, not bare `super`/`super()`: `include Axn` puts axn core's own
@@ -37,9 +33,11 @@ module Axn
           elsif @input_schema_value
             @input_schema_value
           else
-            schema_field_configs = internal_field_configs.reject { |c| EXCLUDED_FROM_INPUT_SCHEMA.include?(c.field) }
+            # server_context is declared `on: :ambient_context` (see above), so axn core's own
+            # Axn::Reflection::Schema.build_input already excludes it (and any other ambient
+            # subfield) from internal_field_configs/properties -- no hand-rolled exclusion list needed.
             @input_schema_value = ::MCP::Tool::InputSchema.new(
-              Axn::Reflection::Schema.build_input(schema_field_configs, subfield_configs),
+              Axn::Reflection::Schema.build_input(internal_field_configs, subfield_configs),
             )
           end
         end
@@ -87,14 +85,13 @@ module Axn
         end
 
         def call(**kwargs)
-          result = new(**kwargs).tap(&:_run).result
-
-          # Branch on presence of server_context:
-          # - Present: called from MCP server, return MCP::Tool::Response
+          # Branch on presence of server_context: (back-compat contract, must not change):
+          # - Present: called from MCP server -- route server_context into ambient_context: via the
+          #   shared Invocation helper, return MCP::Tool::Response
           # - Absent: called directly as Axn, return Axn::Result
-          return result unless kwargs.key?(:server_context)
+          return Invocation.perform(self, kwargs, text_content: resolved_mcp_text_content) if kwargs.key?(:server_context)
 
-          Serializer.result_to_mcp_response(result, external_field_configs, text_content: resolved_mcp_text_content)
+          new(**kwargs).tap(&:_run).result
         end
 
         def call!(**)

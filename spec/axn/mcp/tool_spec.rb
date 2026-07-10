@@ -131,7 +131,9 @@ RSpec.describe Axn::MCP::Tool do
         end
 
         tool.call(server_context: { user_id: 123 })
-        expect(received_context).to eq({ user_id: 123 })
+        # server_context now flows through axn core's ambient_context resolution, which normalizes the
+        # hash via with_indifferent_access -- string-keyed comparison, not the original symbol keys.
+        expect(received_context).to eq({ "user_id" => 123 })
       end
 
       it "does not include server_context in input schema" do
@@ -142,6 +144,36 @@ RSpec.describe Axn::MCP::Tool do
         schema = tool.input_schema.to_h
         expect(schema[:properties]).to have_key(:name)
         expect(schema[:properties]).not_to have_key(:server_context)
+      end
+
+      it "is excluded from input_schema via the ambient_context mechanism, not a hardcoded list" do
+        tool = Class.new(described_class) do
+          expects :name, type: String
+          def call = nil
+        end
+
+        # No :server_context key anywhere in internal_field_configs -- it's not a top-level field at all.
+        expect(tool.internal_field_configs.map(&:field)).not_to include(:server_context)
+        expect(tool.input_schema_value.to_h[:properties]).not_to have_key(:server_context)
+      end
+
+      it "does not leak Rails Current state into ambient_context when called via MCP" do
+        current_class = Class.new(ActiveSupport::CurrentAttributes) { attribute :leaky }
+        stub_const("ToolSpecLeakyCurrent", current_class)
+        current_class.leaky = "should never appear"
+
+        tool = Class.new(described_class) do
+          expects :leaky, on: :ambient_context, type: String, optional: true
+          exposes :res, type: String, optional: true
+          def call
+            expose res: leaky
+          end
+        end
+
+        response = tool.call(server_context: { user_id: 1 })
+        expect(JSON.parse(response.content.first[:text])["res"]).to be_nil
+      ensure
+        current_class&.reset
       end
     end
 
