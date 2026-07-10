@@ -20,6 +20,19 @@ RSpec.describe Axn::MCP::Tool do
         expect(response.content.first[:text]).to include("completed successfully")
       end
 
+      it "still takes the MCP-mode branch when server_context arrives under a string key" do
+        tool = Class.new(described_class) do
+          expects :name, type: String
+
+          def call
+            # no-op, success
+          end
+        end
+
+        response = tool.call("name" => "Alice", "server_context" => server_context)
+        expect(response).to be_a(MCP::Tool::Response)
+      end
+
       it "uses result.message for text content" do
         tool = Class.new(described_class) do
           expects :name, type: String

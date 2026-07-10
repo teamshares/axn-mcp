@@ -95,7 +95,11 @@ module Axn
           # - Present: called from MCP server -- route server_context into ambient_context: via the
           #   shared Invocation helper, return MCP::Tool::Response
           # - Absent: called directly as Axn, return Axn::Result
-          return Invocation.perform(self, kwargs, text_content: resolved_mcp_text_content) if kwargs.key?(:server_context)
+          # Check both the Symbol and String forms of the key: a forwarding layer that splats
+          # parsed JSON without symbolizing first (the same case Invocation.perform itself
+          # defends against) would otherwise fall through to direct-Axn mode and return the wrong
+          # response type even though the caller clearly intended an MCP-mode call.
+          return Invocation.perform(self, kwargs, text_content: resolved_mcp_text_content) if kwargs.key?(:server_context) || kwargs.key?("server_context")
 
           new(**kwargs).tap(&:_run).result
         end

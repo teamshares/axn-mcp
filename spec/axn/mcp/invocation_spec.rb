@@ -38,6 +38,24 @@ RSpec.describe Axn::MCP::Invocation do
       expect(JSON.parse(response.content.first[:text])["seen_context"]).to eq("user_id" => 1)
     end
 
+    it "prefers an explicit nil symbol-keyed server_context over a forged string-keyed one" do
+      axn_class = Class.new do
+        include Axn
+
+        expects :server_context, on: :ambient_context, type: Object, optional: true
+        exposes :seen_context, type: Hash, optional: true
+
+        def call
+          expose seen_context: server_context
+        end
+      end
+
+      forged = { user_id: "attacker" }
+      response = described_class.perform(axn_class, { server_context: nil, "server_context" => forged }, text_content: :structured)
+
+      expect(JSON.parse(response.content.first[:text])["seen_context"]).to be_nil
+    end
+
     it "passes ambient_context: nil explicitly (not omitted) when server_context is nil, so no Current default leaks in" do
       axn_class = Class.new do
         include Axn
