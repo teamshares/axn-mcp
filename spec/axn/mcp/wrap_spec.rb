@@ -48,4 +48,25 @@ RSpec.describe "Axn::MCP.wrap" do
 
     expect(tool.annotations_value.read_only_hint).to be true
   end
+
+  describe "mcp_text_content resolution" do
+    around do |example|
+      original = Axn::MCP.config.mcp_text_content
+      example.run
+    ensure
+      Axn::MCP.config.mcp_text_content = original
+    end
+
+    it "re-reads the gem-wide config fresh on every call, not just once at wrap-time" do
+      Axn::MCP.config.mcp_text_content = :structured
+      tool = Axn::MCP.wrap(plain_axn, description: "Greets someone")
+
+      structured_response = tool.call(name: "Alice", server_context: {})
+      expect(JSON.parse(structured_response.content.first[:text])).to have_key("greeting")
+
+      Axn::MCP.config.mcp_text_content = :message
+      message_response = tool.call(name: "Alice", server_context: {})
+      expect(message_response.content.first[:text]).to eq("Action completed successfully")
+    end
+  end
 end

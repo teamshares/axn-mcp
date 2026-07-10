@@ -13,7 +13,7 @@ module Axn
       # returns MCP::Tool::Response (never a raw Axn::Result), and it deliberately has no .call! --
       # MCP::Server itself only ever calls .call, and a consumer wanting real bang/raise-on-failure
       # semantics can call the original wrapped class's own .call! directly (unwrapped).
-      def wrap(axn_class, description:, name: nil, annotations: nil, mcp_text_content: Axn::MCP.config.mcp_text_content)
+      def wrap(axn_class, description:, name: nil, annotations: nil, mcp_text_content: nil)
         Class.new(::MCP::Tool) do
           tool_name(name) if name
           description(description)
@@ -25,7 +25,11 @@ module Axn
           self.annotations(**(annotations || hint_annotations)) if annotations || hint_annotations.any?
 
           define_singleton_method(:call) do |**kwargs|
-            Axn::MCP::Invocation.perform(axn_class, kwargs, text_content: mcp_text_content)
+            # Resolved fresh on every call (mcp_text_content || Axn::MCP.config...), not captured
+            # once at wrap-time, so this matches Axn::MCP::Tool#call's resolved_mcp_text_content
+            # guarantee: a gem-wide config change takes effect immediately, even for tools already
+            # wrapped before the change.
+            Axn::MCP::Invocation.perform(axn_class, kwargs, text_content: mcp_text_content || Axn::MCP.config.mcp_text_content)
           end
         end
       end
