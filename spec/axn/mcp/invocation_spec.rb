@@ -33,6 +33,24 @@ RSpec.describe Axn::MCP::Invocation do
       expect(JSON.parse(response.content.first[:text])["res"]).to be_nil
     end
 
+    it "does not let a caller-supplied ambient_context kwarg override the server-injected one" do
+      axn_class = Class.new do
+        include Axn
+
+        expects :server_context, on: :ambient_context, type: Hash, optional: true
+        exposes :seen_context, type: Hash, optional: true
+
+        def call
+          expose seen_context: server_context
+        end
+      end
+
+      forged = { server_context: { user_id: "attacker" } }
+      response = described_class.perform(axn_class, { ambient_context: forged, server_context: { user_id: 1 } }, text_content: :structured)
+
+      expect(JSON.parse(response.content.first[:text])["seen_context"]).to eq("user_id" => 1)
+    end
+
     it "does not leak Rails Current state when server_context is absent from kwargs" do
       current_class = Class.new(ActiveSupport::CurrentAttributes) { attribute :leaky }
       stub_const("InvocationSpecCurrent", current_class)

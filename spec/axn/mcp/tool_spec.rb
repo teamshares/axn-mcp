@@ -1072,6 +1072,29 @@ RSpec.describe Axn::MCP::Tool do
       expect(tool.annotations_value.open_world_hint).to be false
     end
 
+    it "re-derives annotations after a second semantic hint declaration, not just the first" do
+      tool = Class.new(Axn::MCP::Tool) do
+        open_world
+        closed_world
+        def call = nil
+      end
+
+      expect(tool.semantic_hints).to include(:closed_world)
+      expect(tool.semantic_hints).not_to include(:open_world)
+      expect(tool.annotations_value.open_world_hint).to be false
+    end
+
+    it "re-derives annotations after semantic_hints is called again with different hints" do
+      tool = Class.new(Axn::MCP::Tool) do
+        semantic_hints :read_only
+        semantic_hints :idempotent
+        def call = nil
+      end
+
+      expect(tool.annotations_value.read_only_hint).to be false
+      expect(tool.annotations_value.idempotent_hint).to be true
+    end
+
     it "keeps the legacy read_only! bang method's exact prior behavior" do
       tool = Class.new(Axn::MCP::Tool) do
         read_only!

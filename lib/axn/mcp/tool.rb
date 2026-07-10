@@ -136,20 +136,33 @@ module Axn
           annotations(open_world_hint: false)
         end
 
+        # Tracks whether THIS class ever called `annotations(...)` explicitly, as distinct from our
+        # own auto-derivation below (which sets @annotations_value directly, bypassing this method,
+        # so it never marks itself as "explicit"). A plain `annotations_value.nil?` check isn't
+        # enough: once the first `semantic_hints` call auto-derives annotations, @annotations_value
+        # is no longer nil, so a naive nil-check would block every later hint change from
+        # re-deriving -- this flag is what still distinguishes "we set it" from "the user set it".
+        def annotations(hash = NOT_SET)
+          @_mcp_explicit_annotations = true if hash != NOT_SET
+          super
+        end
+
         # Default MCP annotations from axn core's generic `semantic_hints` DSL -- but only when
         # this class never called `annotations(...)` explicitly (explicit always wins; see
-        # `annotations_value.nil?` check below). `::MCP::Tool` leaves `@annotations_value` unset
-        # until `annotations(hash)` is called, so `nil?` cleanly distinguishes "nothing explicit
-        # yet" from "explicit call happened" without adding new state.
+        # `@_mcp_explicit_annotations` above).
         #
         # Re-derives from the FULL `_semantic_hints` list every call (not an incremental patch), so
         # this is idempotent under repeated/overlapping declarations (e.g. open_world then
-        # closed_world ends with only closed_world's annotation applied).
+        # closed_world ends with only closed_world's annotation applied) -- setting @annotations_value
+        # directly here (not via `annotations(...)`) is what keeps `@_mcp_explicit_annotations` false
+        # across our own repeated auto-derivations.
         def semantic_hints(*hints)
           return super if hints.empty?
 
           super
-          annotations(**Axn::MCP::Annotations.annotations_for(_semantic_hints)) if annotations_value.nil?
+          return if @_mcp_explicit_annotations
+
+          @annotations_value = ::MCP::Tool::Annotations.new(**Axn::MCP::Annotations.annotations_for(_semantic_hints))
         end
 
         # Non-bang counterparts to open_world!/closed_world! (which remain unchanged above): these
