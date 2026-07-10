@@ -70,6 +70,16 @@ module Axn
           output_schema
         end
 
+        # axn core's Naming module (`include Axn`) also defines a class-level `description`, storing into
+        # its own `_axn_description` -- unrelated to MCP transport, but it sits ahead of ::MCP::Tool's own
+        # accessor in the singleton ancestor chain and silently shadows it. Bind directly to ::MCP::Tool's
+        # own method (same technique as input_schema/output_schema above) so `description "..."` keeps
+        # reaching @description_value, which `to_h` actually serializes to the MCP client.
+        def description(value = NOT_SET)
+          method = ::MCP::Tool.singleton_class.instance_method(:description).bind(self)
+          value == NOT_SET ? method.call : method.call(value)
+        end
+
         def to_h
           input_schema
           output_schema unless external_field_configs.empty?

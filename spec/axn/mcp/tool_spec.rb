@@ -906,6 +906,18 @@ RSpec.describe Axn::MCP::Tool do
     end
   end
 
+  describe ".description" do
+    it "routes the description DSL to MCP transport, not axn's own internal Naming#description" do
+      tool = Class.new(described_class) do
+        description "A test tool"
+        def call = nil
+      end
+
+      expect(tool.description_value).to eq("A test tool")
+      expect(tool.to_h[:description]).to eq("A test tool")
+    end
+  end
+
   describe "annotation shortcuts" do
     # MCP Tool Annotations: https://github.com/modelcontextprotocol/ruby-sdk#tool-annotations
     # - destructive_hint: Indicates if tool performs destructive operations (default: true)
