@@ -74,5 +74,11 @@ RSpec.describe "Axn::MCP.wrap" do
         Axn::MCP.wrap(plain_axn, description: "Greets someone", mcp_text_content: :mesage)
       end.to raise_error(ArgumentError, "mcp_text_content must be one of :structured, :message; got :mesage")
     end
+
+    it "raises ArgumentError for mcp_text_content: false rather than silently falling back to the default" do
+      expect do
+        Axn::MCP.wrap(plain_axn, description: "Greets someone", mcp_text_content: false)
+      end.to raise_error(ArgumentError, "mcp_text_content must be one of :structured, :message; got false")
+    end
   end
 end

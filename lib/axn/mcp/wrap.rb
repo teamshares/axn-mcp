@@ -16,10 +16,13 @@ module Axn
       VALID_MCP_TEXT_CONTENT = %i[structured message].freeze
 
       def wrap(axn_class, description:, name: nil, annotations: nil, mcp_text_content: nil)
-        # Fail fast on a typo'd value (e.g. :mesage) rather than silently falling through to
-        # :structured -- matches the validation Axn::MCP.config.mcp_text_content=/Tool's
-        # mcp_text_content(...) setting already enforce (same error message shape).
-        if mcp_text_content && !VALID_MCP_TEXT_CONTENT.include?(mcp_text_content)
+        # Fail fast on any explicitly-provided invalid value (a typo like :mesage, or `false`)
+        # rather than silently falling through to :structured -- matches the validation
+        # Axn::MCP.config.mcp_text_content=/Tool's mcp_text_content(...) setting already enforce
+        # (same error message shape). `nil` alone means "not provided" (use the gem-wide default
+        # below) -- checked via `nil?`, not truthiness, so `mcp_text_content: false` can't skip
+        # this guard the way a truthy-only check would.
+        if !mcp_text_content.nil? && !VALID_MCP_TEXT_CONTENT.include?(mcp_text_content)
           raise ArgumentError, "mcp_text_content must be one of #{VALID_MCP_TEXT_CONTENT.map(&:inspect).join(", ")}; got #{mcp_text_content.inspect}"
         end
 

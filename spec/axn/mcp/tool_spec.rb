@@ -223,6 +223,25 @@ RSpec.describe Axn::MCP::Tool do
       expect(result.greeting).to eq("Hello!")
     end
 
+    it "does not leak Rails Current state into ambient_context when called directly (no server_context: at all)" do
+      current_class = Class.new(ActiveSupport::CurrentAttributes) { attribute :leaky }
+      stub_const("ToolSpecDirectLeakyCurrent", current_class)
+      current_class.leaky = "should never appear"
+
+      tool = Class.new(described_class) do
+        expects :leaky, on: :ambient_context, type: String, optional: true
+        exposes :res, type: String, optional: true
+        def call
+          expose res: leaky
+        end
+      end
+
+      result = tool.call
+      expect(result.res).to be_nil
+    ensure
+      current_class&.reset
+    end
+
     it "returns failed Axn::Result on fail!" do
       tool = Class.new(described_class) do
         def call

@@ -101,6 +101,14 @@ module Axn
           # response type even though the caller clearly intended an MCP-mode call.
           return Invocation.perform(self, kwargs, text_content: resolved_mcp_text_content) if kwargs.key?(:server_context) || kwargs.key?("server_context")
 
+          # Direct-Axn mode still needs the same "no Current leakage" guarantee Invocation.perform
+          # gives the MCP-mode branch above: server_context is declared on: :ambient_context, so
+          # without an explicit ambient_context: here axn core would fall back to its configured
+          # Current-attributes-derived default, letting a stale server_context leak in even though
+          # this call never received one -- violating the documented "nil when called directly"
+          # contract. Only inject the empty default when the caller hasn't already supplied their
+          # own explicit ambient_context: (their call, their responsibility, same as any other Axn).
+          kwargs = { ambient_context: {} }.merge(kwargs) unless kwargs.key?(:ambient_context)
           new(**kwargs).tap(&:_run).result
         end
 
