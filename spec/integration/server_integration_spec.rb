@@ -188,7 +188,9 @@ RSpec.describe "MCP Server Integration", type: :integration do
       input_schema = tool[:inputSchema]
       expect(input_schema[:properties][:email][:type]).to eq("string")
       expect(input_schema[:properties][:role][:enum]).to eq(%w[admin member guest])
-      expect(input_schema[:properties][:age][:type]).to eq("integer")
+      # Nullable (optional:) fields reflect as a type array, not a bare type -- see
+      # Axn::Reflection::Schema's documented nullability behavior.
+      expect(input_schema[:properties][:age][:type]).to eq(%w[integer null])
       expect(input_schema[:required]).to include("email", "role")
       expect(input_schema[:required]).not_to include("age")
     end

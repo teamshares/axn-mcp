@@ -21,14 +21,25 @@ module Axn
       class << self
         NOT_SET = Object.new.freeze
 
+        # server_context is an axn-mcp convention (injected by the MCP server, never supplied by the
+        # client) -- not an axn-core concept, so core's Axn::Reflection::Schema (which only excludes
+        # its own :ambient_context) doesn't know to hide it. Filter it out here before reflecting.
+        EXCLUDED_FROM_INPUT_SCHEMA = %i[server_context].freeze
+
         def input_schema(value = NOT_SET)
           if value != NOT_SET
-            super
+            # Explicit-arg super, not bare `super`/`super()`: `include Axn` puts axn core's own
+            # Axn::Core::SchemaReflection::ClassMethods#input_schema (a ZERO-arg reflection reader,
+            # unrelated to this manual-override path) ahead of ::MCP::Tool's in the singleton ancestor
+            # chain, so a forwarding `super` would hit the wrong, arity-0 method. Bind directly to
+            # ::MCP::Tool's own setter to skip over it.
+            ::MCP::Tool.singleton_class.instance_method(:input_schema).bind(self).call(value)
           elsif @input_schema_value
             @input_schema_value
           else
+            schema_field_configs = internal_field_configs.reject { |c| EXCLUDED_FROM_INPUT_SCHEMA.include?(c.field) }
             @input_schema_value = ::MCP::Tool::InputSchema.new(
-              SchemaBuilder.build_input(internal_field_configs, subfield_configs),
+              Axn::Reflection::Schema.build_input(schema_field_configs, subfield_configs),
             )
           end
         end
@@ -39,14 +50,15 @@ module Axn
 
         def output_schema(value = NOT_SET)
           if value != NOT_SET
-            super
+            # See input_schema's comment: skip axn core's zero-arg SchemaReflection#output_schema.
+            ::MCP::Tool.singleton_class.instance_method(:output_schema).bind(self).call(value)
           elsif @output_schema_value
             @output_schema_value
           elsif external_field_configs.empty?
             nil
           else
             @output_schema_value = ::MCP::Tool::OutputSchema.new(
-              SchemaBuilder.build_output(external_field_configs),
+              Axn::Reflection::Schema.build_output(external_field_configs),
             )
           end
         end

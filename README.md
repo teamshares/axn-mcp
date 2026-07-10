@@ -109,10 +109,12 @@ end
   "required": ["region"],
   "properties": {
     "region":  { "type": "string" },
-    "timeout": { "type": "integer" }
+    "timeout": { "type": ["integer", "null"] }
   }
 }
 ```
+
+(`optional:`/nullable fields reflect as a `type` array, not a bare type.)
 
 **`Data.define` struct:**
 
@@ -131,7 +133,7 @@ end
   "required": ["status"],
   "properties": {
     "status":        { "type": "string", "enum": ["connected", "error", "needs_reconnect"] },
-    "active":        { "type": "boolean" },
+    "active":        { "type": ["boolean", "null"] },
     "source":        {},
     "provider_name": {}
   }
@@ -170,8 +172,10 @@ exposes :values, type: Array, of: [String, Numeric]
 ```
 
 ```json
-{ "type": "array", "items": { "anyOf": [{ "type": "string" }, { "type": "number" }] } }
+{ "type": "array", "items": { "anyOf": [{ "type": "string" }, {}] } }
 ```
+
+(The `Numeric` member is left untyped: it admits `Complex`, whose serialized wire form isn't knowable from the declaration alone.)
 
 **`Data.define` struct — bare member names as baseline:**
 
@@ -206,7 +210,7 @@ end
     "required": ["status"],
     "properties": {
       "status":        { "type": "string", "enum": ["connected", "error", "needs_reconnect"] },
-      "active":        { "type": "boolean" },
+      "active":        { "type": ["boolean", "null"] },
       "source":        {},
       "provider_name": {}
     }
@@ -239,12 +243,17 @@ Generates schema:
 {
   "properties": {
     "user_id": {
-      "type": "integer",
-      "description": "ID of the User record"
+      "description": "ID of the User record",
+      "not": { "type": "null" }
     }
   }
 }
 ```
+
+The generated id field's JSON type is intentionally left unconstrained — a model's primary key isn't
+knowable from the declaration (it could be an integer, UUID, string, etc.), and inferring it would
+require a database lookup. A required model field's id still forbids `null` (a null token can never
+resolve to a record).
 
 ### Enums via Inclusion
 
