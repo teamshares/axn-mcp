@@ -12,8 +12,8 @@ RSpec.describe Axn::MCP::Annotations do
   end
 
   describe ".annotations_for" do
-    it "maps read_only to read_only_hint: true" do
-      expect(described_class.annotations_for([:read_only])).to eq(read_only_hint: true)
+    it "maps read_only to read_only_hint: true and destructive_hint: false" do
+      expect(described_class.annotations_for([:read_only])).to eq(read_only_hint: true, destructive_hint: false)
     end
 
     it "maps idempotent to idempotent_hint: true" do
@@ -34,7 +34,13 @@ RSpec.describe Axn::MCP::Annotations do
 
     it "combines multiple hints into one hash" do
       expect(described_class.annotations_for(%i[read_only idempotent])).to eq(
-        read_only_hint: true, idempotent_hint: true,
+        read_only_hint: true, destructive_hint: false, idempotent_hint: true,
+      )
+    end
+
+    it "lets an explicit destructive hint override read_only's implied non-destructiveness when both are declared" do
+      expect(described_class.annotations_for(%i[read_only destructive])).to eq(
+        read_only_hint: true, destructive_hint: true,
       )
     end
 

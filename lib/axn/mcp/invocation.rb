@@ -12,11 +12,14 @@ module Axn
 
       def perform(axn_class, kwargs, text_content:)
         server_context = kwargs[:server_context]
-        # Strip :ambient_context too, not just :server_context: **rest is expanded after the
-        # trusted `ambient_context:` literal below, so a caller-supplied `ambient_context:` kwarg
-        # (e.g. smuggled in as an extra tool argument) would otherwise silently win and let a
-        # caller forge ambient fields such as server_context instead of the real injected value.
-        rest = kwargs.except(:server_context, :ambient_context)
+        # Strip :ambient_context too, not just :server_context, and strip BOTH keys under either
+        # a Symbol or a String form: **rest is expanded after the trusted `ambient_context:`
+        # literal below, so a caller-supplied `ambient_context:`/`"ambient_context"` kwarg (e.g.
+        # smuggled in as an extra tool argument from a transport that splats parsed JSON without
+        # symbolizing keys first) would otherwise silently win -- Ruby keeps a String key distinct
+        # from the Symbol literal at the splat site, and Axn::Context only symbolizes afterwards
+        # (last-write-wins on the collision), so `.except` with Symbol keys alone doesn't catch it.
+        rest = kwargs.reject { |k, _| %w[server_context ambient_context].include?(k.to_s) }
 
         result = axn_class.call(ambient_context: { server_context: }, **rest)
         Serializer.result_to_mcp_response(result, axn_class.external_field_configs, text_content:)

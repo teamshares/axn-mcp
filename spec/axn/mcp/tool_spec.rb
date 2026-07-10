@@ -1039,6 +1039,7 @@ RSpec.describe Axn::MCP::Tool do
       end
 
       expect(tool.annotations_value.read_only_hint).to be true
+      expect(tool.annotations_value.destructive_hint).to be false
     end
 
     it "does not override an explicitly-declared annotations(...) call" do
