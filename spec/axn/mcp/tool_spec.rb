@@ -1128,6 +1128,18 @@ RSpec.describe Axn::MCP::Tool do
       expect(tool.annotations_value.idempotent_hint).to be true
     end
 
+    it "applies a base class's declared semantic_hints to subclasses that never redeclare them" do
+      base = Class.new(Axn::MCP::Tool) do
+        semantic_hints :read_only
+        def call = nil
+      end
+      subclass = Class.new(base)
+
+      expect(subclass.semantic_hints).to include(:read_only)
+      expect(subclass.annotations_value.read_only_hint).to be true
+      expect(subclass.annotations_value.destructive_hint).to be false
+    end
+
     it "keeps the legacy read_only! bang method's exact prior behavior" do
       tool = Class.new(Axn::MCP::Tool) do
         read_only!

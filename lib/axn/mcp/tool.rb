@@ -15,6 +15,12 @@ module Axn
       expects :server_context, on: :ambient_context, type: Object, optional: true,
                                description: "MCP server context (injected automatically)"
 
+      # Whether THIS class (or an ancestor, since class_attribute inherits) ever called
+      # `annotations(...)` explicitly -- a class_attribute (not a plain ivar) so it's visible to
+      # subclasses too: a subclass otherwise starts with its own nil `@annotations_value` (mcp's
+      # own `inherited` hook resets it) and no memory of an ancestor's explicit call.
+      class_attribute :_mcp_explicit_annotations, instance_accessor: false, default: false
+
       # Base error headline, read fresh from config on every failure (a block, not a literal, so
       # Axn::MCP.config.error_headline= takes effect immediately -- no reload/require-order gotcha).
       # Two coupled effects (see axn's Axn::Configurable error prefixing):
@@ -154,38 +160,36 @@ module Axn
           annotations(open_world_hint: false)
         end
 
-        # Tracks whether THIS class ever called `annotations(...)` explicitly, as distinct from our
-        # own auto-derivation below (which sets @annotations_value directly, bypassing this method,
-        # so it never marks itself as "explicit"). A plain `annotations_value.nil?` check isn't
-        # enough: once the first `semantic_hints` call auto-derives annotations, @annotations_value
-        # is no longer nil, so a naive nil-check would block every later hint change from
-        # re-deriving -- this flag is what still distinguishes "we set it" from "the user set it".
+        # Tracks whether `annotations(...)` was ever called explicitly (see the class_attribute
+        # declared above the `class << self` block) -- explicit always wins over the semantic_hints
+        # default below, and this deliberately does NOT get set by that default's own derivation
+        # (see `annotations_value` below, which sets @annotations_value directly rather than
+        # calling back through this method).
         def annotations(hash = NOT_SET)
-          @_mcp_explicit_annotations = true if hash != NOT_SET
+          self._mcp_explicit_annotations = true if hash != NOT_SET
           super
         end
 
         # Default MCP annotations from axn core's generic `semantic_hints` DSL -- but only when
-        # this class never called `annotations(...)` explicitly (explicit always wins; see
-        # `@_mcp_explicit_annotations` above).
-        #
-        # Re-derives from the FULL `_semantic_hints` list every call (not an incremental patch), so
-        # this is idempotent under repeated/overlapping declarations (e.g. open_world then
-        # closed_world ends with only closed_world's annotation applied) -- setting @annotations_value
-        # directly here (not via `annotations(...)`) is what keeps `@_mcp_explicit_annotations` false
-        # across our own repeated auto-derivations.
-        def semantic_hints(*hints)
-          return super if hints.empty?
+        # `annotations(...)` was never called explicitly (on this class OR an ancestor; see
+        # `_mcp_explicit_annotations` above). Derives lazily, on every read, from the FULL current
+        # `_semantic_hints` list (not an incremental patch) -- rather than eagerly inside
+        # `semantic_hints`/`open_world`/`closed_world` -- so it's idempotent under repeated/
+        # overlapping hint declarations (e.g. open_world then closed_world nets only closed_world's
+        # annotation), AND so a subclass that inherits `_semantic_hints` from a base class without
+        # redeclaring them still gets the right annotations: `::MCP::Tool`'s own `inherited` hook
+        # resets @annotations_value to nil for every subclass, so eagerly setting it only on the
+        # class where `semantic_hints` happened to be called would leave a silent subclass stale.
+        def annotations_value
+          return super if _mcp_explicit_annotations
+          return super if _semantic_hints.empty?
 
-          super
-          return if @_mcp_explicit_annotations
-
-          @annotations_value = ::MCP::Tool::Annotations.new(**Axn::MCP::Annotations.annotations_for(_semantic_hints))
+          ::MCP::Tool::Annotations.new(**Axn::MCP::Annotations.annotations_for(_semantic_hints))
         end
 
         # Non-bang counterparts to open_world!/closed_world! (which remain unchanged above): these
-        # go through the semantic_hints-driven default mechanism rather than calling `annotations`
-        # directly, so an explicit `annotations(...)` call still wins over them.
+        # just update `_semantic_hints` via axn core's own DSL -- `annotations_value` above derives
+        # the MCP annotation from it lazily, so an explicit `annotations(...)` call still wins.
         def open_world
           semantic_hints(*(_semantic_hints + [:open_world] - [:closed_world]))
         end
