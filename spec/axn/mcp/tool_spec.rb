@@ -1140,6 +1140,17 @@ RSpec.describe Axn::MCP::Tool do
       expect(subclass.annotations_value.destructive_hint).to be false
     end
 
+    it "agrees with .annotations (not just .annotations_value), since MCP::Server's own protocol-version validation reads .annotations" do
+      tool = Class.new(Axn::MCP::Tool) do
+        semantic_hints :read_only
+        def call = nil
+      end
+
+      expect(tool.annotations).not_to be_nil
+      expect(tool.annotations.read_only_hint).to be true
+      expect(tool.annotations.destructive_hint).to be false
+    end
+
     it "keeps the legacy read_only! bang method's exact prior behavior" do
       tool = Class.new(Axn::MCP::Tool) do
         read_only!

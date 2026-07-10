@@ -165,9 +165,22 @@ module Axn
         # default below, and this deliberately does NOT get set by that default's own derivation
         # (see `annotations_value` below, which sets @annotations_value directly rather than
         # calling back through this method).
+        #
+        # The getter path (no args) delegates to `annotations_value` below rather than `super`:
+        # `MCP::Server`'s own protocol-version validation reads `tool.annotations` (this method),
+        # while serialization reads `tool.annotations_value` -- if only the latter derived from
+        # semantic_hints, a hint-derived annotation could be emitted without ever passing that
+        # validation. The setter path can't use plain `super`/`super()` either: our own `NOT_SET`
+        # sentinel (defined above, in this class's `class << self`) is a different object from
+        # `::MCP::Tool`'s own internal `NOT_SET`, so forwarding it as `hash` would make `::MCP::Tool`
+        # wrongly treat "no argument given" as "given this literal Object" and crash trying to
+        # build `Annotations.new(**that_object)`. Bind directly to `::MCP::Tool`'s own setter
+        # instead (same technique as input_schema/output_schema/description above).
         def annotations(hash = NOT_SET)
-          self._mcp_explicit_annotations = true if hash != NOT_SET
-          super
+          return annotations_value if hash == NOT_SET
+
+          self._mcp_explicit_annotations = true
+          ::MCP::Tool.singleton_class.instance_method(:annotations).bind(self).call(hash)
         end
 
         # Default MCP annotations from axn core's generic `semantic_hints` DSL -- but only when
