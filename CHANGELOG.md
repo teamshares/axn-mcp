@@ -41,7 +41,9 @@
   independent convenience methods.
 - Requires an `axn` version that ships `Axn::Core::SchemaReflection`, `Axn::Core::SemanticHints`,
   `Axn::Core::AmbientContext`, `Axn::ExtensionConfig#register_semantic_hint`, and
-  `Axn::Reflection::{Schema,Values}` (axn PRO-2842).
+  `Axn::Reflection::{Schema,Values}` (axn PRO-2842). As of this writing, axn has no tagged release
+  with these primitives yet; this gem's Gemfile currently tracks `axn` git `main`
+  (`github: "teamshares/axn", branch: "main"`) pending an axn release.
 
 ## 0.1.1
 

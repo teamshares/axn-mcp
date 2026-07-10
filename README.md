@@ -390,6 +390,12 @@ If a wrapped Axn needs server-injected data, it must declare the field itself, t
 
 `wrap` accepts the same shaping options as `Tool.define`: `name:`, `annotations:`, and `mcp_text_content:` (defaulting to the gem-wide `Axn::MCP.config.mcp_text_content`).
 
+Unlike `Axn::MCP::Tool`, the generated subclass itself has no dual-mode: its `.call` always returns
+`MCP::Tool::Response`, never a raw `Axn::Result` (that's still true only of the *original*,
+untouched class). For the same reason, the generated subclass has no `.call!` either — a bang
+method that just delegated to `.call` would promise raise-on-failure semantics it doesn't deliver;
+if you want real bang semantics, call the original wrapped class's own `.call!` directly.
+
 ### Server Context
 
 `server_context` is automatically available in all tools (no declaration needed):

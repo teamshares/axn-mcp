@@ -219,5 +219,57 @@ RSpec.describe "Direct Axn Invocation", type: :integration do
         expect(response[:result][:structuredContent]).to eq({ doubled: 42 })
       end
     end
+
+    describe "Axn::MCP.wrap through a real MCP::Server (author once, expose over MCP transport)" do
+      let(:plain_axn) do
+        Class.new do
+          include Axn
+
+          def self.name = "DoubleValuePlainly"
+
+          expects :value, type: Integer
+          expects :server_context, on: :ambient_context, type: Hash, optional: true
+          exposes :doubled, type: Integer
+
+          def call
+            expose doubled: value * 2
+          end
+        end
+      end
+
+      let(:wrapped_tool) { Axn::MCP.wrap(plain_axn, description: "Doubles a value", name: "double_value_plainly") }
+
+      it "lists the wrapped tool's schema via tools/list" do
+        server = MCP::Server.new(
+          name: "test",
+          version: "1.0.0",
+          tools: [wrapped_tool],
+          server_context: { user_id: 1 },
+        )
+
+        request = { jsonrpc: "2.0", id: 1, method: "tools/list" }.to_json
+        response = JSON.parse(server.handle_json(request), symbolize_names: true)
+
+        tool_description = response[:result][:tools].first
+        expect(tool_description[:name]).to eq("double_value_plainly")
+        expect(tool_description[:inputSchema][:properties]).to have_key(:value)
+        expect(tool_description[:inputSchema][:properties]).not_to have_key(:server_context)
+      end
+
+      it "round-trips a tools/call, proving the original plain Axn is exposed over real MCP transport" do
+        server = MCP::Server.new(
+          name: "test",
+          version: "1.0.0",
+          tools: [wrapped_tool],
+          server_context: { user_id: 1 },
+        )
+
+        request = { jsonrpc: "2.0", id: 1, method: "tools/call",
+                    params: { name: "double_value_plainly", arguments: { value: 21 } } }.to_json
+        response = JSON.parse(server.handle_json(request), symbolize_names: true)
+
+        expect(response[:result][:structuredContent]).to eq({ doubled: 42 })
+      end
+    end
   end
 end
