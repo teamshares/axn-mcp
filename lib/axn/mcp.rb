@@ -5,6 +5,7 @@ require "axn"
 require "mcp"
 
 require_relative "mcp/version"
+Axn.extension_config.register_semantic_hint(:open_world, :closed_world)
 
 module Axn
   module MCP
@@ -20,6 +21,7 @@ end
 # Required after the module above extends Axn::Configurable, since Tool calls
 # Axn::MCP.overrides at class-definition time. (Setting declaration order is
 # free, but the extend must happen first.)
+require_relative "mcp/annotations"
 require_relative "mcp/serializer"
 require_relative "mcp/schema_builder"
 require_relative "mcp/field_declarations"
