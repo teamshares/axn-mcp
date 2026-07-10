@@ -17,11 +17,16 @@
   (combine `shape:` with `of:` for typed output items — the `expects` input schema is unaffected).
 - `server_context` is no longer a declared top-level field on `Axn::MCP::Tool` — it's routed
   through axn core's new `ambient_context` mechanism (`expects :server_context, on:
-  :ambient_context`). It also now arrives as an `ActiveSupport::HashWithIndifferentAccess`, not a
-  plain `Hash` — a direct consequence of being resolved through axn core's ambient-context
-  machinery. `is_a?(Hash)`, `#[]`, and `#dig` all still work as before (including with symbol
-  keys); `instance_of?(Hash)` no longer holds, and `#==` against a literal `Hash` with symbol keys
-  no longer holds either (`{ "user_id" => 42 }` matches; `{ user_id: 42 }` does not). The
+  :ambient_context, type: Object`). Its exact class now depends on how the tool was invoked and
+  which `mcp` gem version is in use: a direct/test-style call passing a plain `Hash` gets it
+  resolved to an `ActiveSupport::HashWithIndifferentAccess` (a consequence of axn core's
+  ambient-context machinery — `is_a?(Hash)`/`#[]`/`#dig` still work as before, including with
+  symbol keys; `instance_of?(Hash)` and `#==` against a literal symbol-keyed `Hash` do not); a real
+  `MCP::Server` round-trip on recent `mcp` gem versions instead passes an `MCP::ServerContext`
+  object, which isn't Hash-like at all but transparently delegates `#dig`/`#[]`/etc. to whatever
+  context object the server was configured with. `type: Object` (not `Hash`) reflects that the
+  field's runtime shape isn't fixed. Read with `&.dig(...)`/`&.[]` rather than asserting a class —
+  that works uniformly across both cases and is unchanged from before this release. The
   `server_context` reader inside a tool's `#call` is otherwise unchanged: still the raw injected
   value, still `nil` when the tool is called directly without `server_context:`, and still excluded
   from `inputSchema`. An explicit `server_context:` now also fully replaces any process-wide
@@ -30,7 +35,7 @@
 - Added `Axn::MCP.wrap(any_axn, description:, **opts)`, exposing a plain Axn (one that does *not*
   subclass `Axn::MCP::Tool`) as an `::MCP::Tool` subclass — "author once," per axn PRO-2842/PRO-2844.
   A wrapped Axn that needs server-injected data must declare its own `expects :server_context, on:
-  :ambient_context, type: Hash` (the same convention `Axn::MCP::Tool` itself uses) and read it via
+  :ambient_context, type: Object` (the same convention `Axn::MCP::Tool` itself uses) and read it via
   `server_context&.dig(...)`.
 - Added `open_world`/`closed_world` as `semantic_hints`, registered via
   `Axn.extension_config.register_semantic_hint` (axn core's new extension registry) — no core change

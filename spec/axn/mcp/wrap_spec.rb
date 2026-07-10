@@ -8,7 +8,7 @@ RSpec.describe "Axn::MCP.wrap" do
       def self.name = "GreetPlainly"
 
       expects :name, type: String
-      expects :server_context, on: :ambient_context, type: Hash, optional: true
+      expects :server_context, on: :ambient_context, type: Object, optional: true
       exposes :greeting, type: String
 
       def call

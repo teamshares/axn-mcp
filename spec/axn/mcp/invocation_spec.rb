@@ -7,7 +7,7 @@ RSpec.describe Axn::MCP::Invocation do
         include Axn
 
         expects :name, type: String
-        expects :server_context, on: :ambient_context, type: Hash, optional: true
+        expects :server_context, on: :ambient_context, type: Object, optional: true
         exposes :seen_context, type: Hash, optional: true
 
         def call
@@ -37,7 +37,7 @@ RSpec.describe Axn::MCP::Invocation do
       axn_class = Class.new do
         include Axn
 
-        expects :server_context, on: :ambient_context, type: Hash, optional: true
+        expects :server_context, on: :ambient_context, type: Object, optional: true
         exposes :seen_context, type: Hash, optional: true
 
         def call

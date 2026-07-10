@@ -6,7 +6,13 @@ module Axn
       include Axn
       include Axn::MCP.overrides
 
-      expects :server_context, on: :ambient_context, type: Hash, optional: true,
+      # type: Object (not Hash): the `mcp` gem doesn't guarantee a raw Hash here across its own
+      # version range -- newer versions (e.g. 0.23) wrap it in an MCP::ServerContext object (which
+      # delegates arbitrary methods like #dig to the underlying context via method_missing), while
+      # direct/test calls typically pass a plain Hash. `type: Object` (true for any value via
+      # `is_a?`) just satisfies axn core's "at least one validation" requirement for an ambient
+      # subfield without constraining to a shape the transport doesn't actually guarantee.
+      expects :server_context, on: :ambient_context, type: Object, optional: true,
                                description: "MCP server context (injected automatically)"
 
       # Base error headline, read fresh from config on every failure (a block, not a literal, so

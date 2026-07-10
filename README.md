@@ -368,7 +368,7 @@ class GreetPlainly
   include Axn
 
   expects :name, type: String
-  expects :server_context, on: :ambient_context, type: Hash, optional: true
+  expects :server_context, on: :ambient_context, type: Object, optional: true
   exposes :greeting, type: String
 
   def call
@@ -386,7 +386,7 @@ GreetPlainlyTool.input_schema_value.to_h[:properties].keys # => [:name] (server_
 GreetPlainlyTool.call(name: "Bob", server_context: { user_id: 42 }) # => MCP::Tool::Response
 ```
 
-If a wrapped Axn needs server-injected data, it must declare the field itself, the same way `Axn::MCP::Tool` does — `expects :server_context, on: :ambient_context, type: Hash` (not, say, `expects :user_id, on: :ambient_context` directly) — and read it with the same `server_context&.dig(...)` convention used throughout this README. `Axn::MCP.wrap` doesn't inject anything the wrapped class didn't ask for; it just plumbs the `server_context:` kwarg passed to `.call` into `ambient_context:` before invoking the wrapped Axn.
+If a wrapped Axn needs server-injected data, it must declare the field itself, the same way `Axn::MCP::Tool` does — `expects :server_context, on: :ambient_context, type: Object` (not, say, `expects :user_id, on: :ambient_context` directly) — and read it with the same `server_context&.dig(...)` convention used throughout this README. `Axn::MCP.wrap` doesn't inject anything the wrapped class didn't ask for; it just plumbs the `server_context:` kwarg passed to `.call` into `ambient_context:` before invoking the wrapped Axn.
 
 `wrap` accepts the same shaping options as `Tool.define`: `name:`, `annotations:`, and `mcp_text_content:` (defaulting to the gem-wide `Axn::MCP.config.mcp_text_content`).
 
@@ -413,9 +413,9 @@ end
 
 Note the safe navigation (`&.dig`): `server_context` may be `nil` if the tool is invoked directly as a standard Axn action rather than through the MCP server.
 
-The `server_context` field is excluded from the generated `inputSchema` since it's injected by the MCP server, not provided by the LLM. Under the hood, `Axn::MCP::Tool` declares `expects :server_context, on: :ambient_context, type: Hash, optional: true` and routes the value passed to `.call(server_context: ...)` through `axn` core's `ambient_context` mechanism — this is also what keeps it out of `inputSchema` (any `on: :ambient_context` field is excluded automatically, not via a hand-rolled list) and what guarantees an explicit `server_context:` replaces any process-wide ambient context for that call, so server-side state can't leak into an MCP invocation.
+The `server_context` field is excluded from the generated `inputSchema` since it's injected by the MCP server, not provided by the LLM. Under the hood, `Axn::MCP::Tool` declares `expects :server_context, on: :ambient_context, type: Object, optional: true` and routes the value passed to `.call(server_context: ...)` through `axn` core's `ambient_context` mechanism — this is also what keeps it out of `inputSchema` (any `on: :ambient_context` field is excluded automatically, not via a hand-rolled list) and what guarantees an explicit `server_context:` replaces any process-wide ambient context for that call, so server-side state can't leak into an MCP invocation.
 
-One consequence of that routing: `server_context` arrives as an `ActiveSupport::HashWithIndifferentAccess`, not a plain `Hash`. `#[]`, `#dig`, and `is_a?(Hash)` all work as shown above regardless of whether you index with symbols or strings; `instance_of?(Hash)` and `#==` against a literal `Hash` with symbol keys do not hold (compare against string keys, or index into it instead).
+`type: Object` (not `Hash`) is deliberate: `server_context`'s actual class depends on how the tool was invoked and which `mcp` gem version is in use. A direct/test-style call (`Tool.call(server_context: {user_id: 1})`) passes whatever raw value you gave it through, which axn's `ambient_context` resolution wraps in an `ActiveSupport::HashWithIndifferentAccess` if it's a plain `Hash` — `#[]`/`#dig`/`is_a?(Hash)` all work regardless of symbol- or string-keyed access; `instance_of?(Hash)`/`#==` against a literal symbol-keyed `Hash` do not. A real `MCP::Server` round-trip (recent `mcp` gem versions) instead passes an `MCP::ServerContext` object, which is not Hash-like at all but transparently delegates arbitrary method calls — including `#dig`/`#[]` — to whatever context object the server was configured with (`MCP::Server.new(server_context: ...)`) via `method_missing`. Reading with `&.dig(...)`/`&.[]` (rather than asserting a specific class) works uniformly across both cases.
 
 ### Dual-Use: MCP Server vs Direct Invocation
 

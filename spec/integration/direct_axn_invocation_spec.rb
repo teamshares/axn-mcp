@@ -228,7 +228,7 @@ RSpec.describe "Direct Axn Invocation", type: :integration do
           def self.name = "DoubleValuePlainly"
 
           expects :value, type: Integer
-          expects :server_context, on: :ambient_context, type: Hash, optional: true
+          expects :server_context, on: :ambient_context, type: Object, optional: true
           exposes :doubled, type: Integer
 
           def call
