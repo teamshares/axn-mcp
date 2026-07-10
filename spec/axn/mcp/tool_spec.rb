@@ -1031,6 +1031,58 @@ RSpec.describe Axn::MCP::Tool do
     end
   end
 
+  describe "semantic_hints -> MCP annotations default mapping" do
+    it "derives read_only_hint from a declared semantic_hints :read_only" do
+      tool = Class.new(Axn::MCP::Tool) do
+        semantic_hints :read_only
+        def call = nil
+      end
+
+      expect(tool.annotations_value.read_only_hint).to be true
+    end
+
+    it "does not override an explicitly-declared annotations(...) call" do
+      tool = Class.new(Axn::MCP::Tool) do
+        semantic_hints :read_only
+        annotations(title: "Explicit Title")
+        def call = nil
+      end
+
+      expect(tool.annotations_value.read_only_hint).to be false # explicit annotations() call wins, reverts to MCP default
+      expect(tool.annotations_value.title).to eq("Explicit Title")
+    end
+
+    it "supports open_world as a semantic hint, registered via the extension registry (no core change)" do
+      tool = Class.new(Axn::MCP::Tool) do
+        open_world
+        def call = nil
+      end
+
+      expect(tool.semantic_hints).to include(:open_world)
+      expect(tool.annotations_value.open_world_hint).to be true
+    end
+
+    it "supports closed_world as a semantic hint" do
+      tool = Class.new(Axn::MCP::Tool) do
+        closed_world
+        def call = nil
+      end
+
+      expect(tool.semantic_hints).to include(:closed_world)
+      expect(tool.annotations_value.open_world_hint).to be false
+    end
+
+    it "keeps the legacy read_only! bang method's exact prior behavior" do
+      tool = Class.new(Axn::MCP::Tool) do
+        read_only!
+        def call = nil
+      end
+
+      expect(tool.annotations_value.read_only_hint).to be true
+      expect(tool.annotations_value.destructive_hint).to be false
+    end
+  end
+
   describe ".define" do
     it "creates a tool class with expects/exposes" do
       tool = described_class.define(

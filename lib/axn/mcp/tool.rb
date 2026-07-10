@@ -136,6 +136,33 @@ module Axn
           annotations(open_world_hint: false)
         end
 
+        # Default MCP annotations from axn core's generic `semantic_hints` DSL -- but only when
+        # this class never called `annotations(...)` explicitly (explicit always wins; see
+        # `annotations_value.nil?` check below). `::MCP::Tool` leaves `@annotations_value` unset
+        # until `annotations(hash)` is called, so `nil?` cleanly distinguishes "nothing explicit
+        # yet" from "explicit call happened" without adding new state.
+        #
+        # Re-derives from the FULL `_semantic_hints` list every call (not an incremental patch), so
+        # this is idempotent under repeated/overlapping declarations (e.g. open_world then
+        # closed_world ends with only closed_world's annotation applied).
+        def semantic_hints(*hints)
+          return super if hints.empty?
+
+          super
+          annotations(**Axn::MCP::Annotations.annotations_for(_semantic_hints)) if annotations_value.nil?
+        end
+
+        # Non-bang counterparts to open_world!/closed_world! (which remain unchanged above): these
+        # go through the semantic_hints-driven default mechanism rather than calling `annotations`
+        # directly, so an explicit `annotations(...)` call still wins over them.
+        def open_world
+          semantic_hints(*(_semantic_hints + [:open_world] - [:closed_world]))
+        end
+
+        def closed_world
+          semantic_hints(*(_semantic_hints + [:closed_world] - [:open_world]))
+        end
+
         # Factory-style tool definition for quick one-off tools
         def define(description:, expects: [], exposes: [], annotations: nil, mcp_text_content: NOT_SET, **_opts, &block)
           tool_class = Class.new(self) do
