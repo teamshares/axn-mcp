@@ -24,4 +24,5 @@ end
 require_relative "mcp/annotations"
 require_relative "mcp/serializer"
 require_relative "mcp/field_declarations"
+require_relative "mcp/invocation"
 require_relative "mcp/tool"
