@@ -1151,6 +1151,17 @@ RSpec.describe Axn::MCP::Tool do
       expect(tool.annotations.destructive_hint).to be false
     end
 
+    it "leaves annotations absent (not SDK defaults) when a declared semantic hint maps to no MCP annotation" do
+      Axn.extension_config.register_semantic_hint(:cacheable)
+      tool = Class.new(Axn::MCP::Tool) do
+        semantic_hints :cacheable
+        def call = nil
+      end
+
+      expect(tool.annotations_value).to be_nil
+      expect(tool.annotations).to be_nil
+    end
+
     it "keeps the legacy read_only! bang method's exact prior behavior" do
       tool = Class.new(Axn::MCP::Tool) do
         read_only!

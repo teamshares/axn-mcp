@@ -195,9 +195,16 @@ module Axn
         # class where `semantic_hints` happened to be called would leave a silent subclass stale.
         def annotations_value
           return super if _mcp_explicit_annotations
-          return super if _semantic_hints.empty?
 
-          ::MCP::Tool::Annotations.new(**Axn::MCP::Annotations.annotations_for(_semantic_hints))
+          mapped = Axn::MCP::Annotations.annotations_for(_semantic_hints)
+          # Empty either because no hints are declared, or because every declared hint (e.g. one a
+          # different adapter registered and uses, like :cacheable) maps to no MCP annotation at
+          # all -- either way, that's "nothing to derive", not "apply every Annotations.new default"
+          # (destructive_hint: true, open_world_hint: true, etc.), which would misrepresent a tool
+          # that never asked for those defaults and could fail an MCP::Server protocol-version check.
+          return super if mapped.empty?
+
+          ::MCP::Tool::Annotations.new(**mapped)
         end
 
         # Non-bang counterparts to open_world!/closed_world! (which remain unchanged above): these

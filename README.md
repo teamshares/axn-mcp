@@ -388,7 +388,7 @@ GreetPlainlyTool.call(name: "Bob", server_context: { user_id: 42 }) # => MCP::To
 
 If a wrapped Axn needs server-injected data, it must declare the field itself, the same way `Axn::MCP::Tool` does — `expects :server_context, on: :ambient_context, type: Object` (not, say, `expects :user_id, on: :ambient_context` directly) — and read it with the same `server_context&.dig(...)` convention used throughout this README. `Axn::MCP.wrap` doesn't inject anything the wrapped class didn't ask for; it just plumbs the `server_context:` kwarg passed to `.call` into `ambient_context:` before invoking the wrapped Axn.
 
-`wrap` accepts the same shaping options as `Tool.define`: `name:`, `annotations:`, and `mcp_text_content:` (defaulting to the gem-wide `Axn::MCP.config.mcp_text_content`).
+`wrap` also accepts `name:`, `annotations:`, and `mcp_text_content:` (defaulting to the gem-wide `Axn::MCP.config.mcp_text_content`) — `annotations:`/`mcp_text_content:` mirror `Tool.define`'s own options of the same name, but `name:` is `wrap`-specific: `Tool.define` has no equivalent (it takes no `name:` option; a factory tool's MCP name is derived from the anonymous class as usual).
 
 Unlike `Axn::MCP::Tool`, the generated subclass itself has no dual-mode: its `.call` always returns
 `MCP::Tool::Response`, never a raw `Axn::Result` (that's still true only of the *original*,
