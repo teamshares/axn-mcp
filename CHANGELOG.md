@@ -36,7 +36,10 @@
   subclass `Axn::MCP::Tool`) as an `::MCP::Tool` subclass — "author once," per axn PRO-2842/PRO-2844.
   A wrapped Axn that needs server-injected data must declare its own `expects :server_context, on:
   :ambient_context, type: Object` (the same convention `Axn::MCP::Tool` itself uses) and read it via
-  `server_context&.dig(...)`.
+  `server_context&.dig(...)`. `name:` defaults to a snake-cased version of the wrapped Axn's own
+  class name when omitted (needed for the common inline `tools: [Axn::MCP.wrap(...)]` registration,
+  since an unassigned anonymous class has no name of its own); raises `ArgumentError` instead of
+  silently registering an unnamed, unusable tool if the wrapped Axn is also anonymous.
 - Added `open_world`/`closed_world` as `semantic_hints`, registered via
   `Axn.extension_config.register_semantic_hint` (axn core's new extension registry) — no core change
   needed to add MCP-spec-only vocabulary. A class's declared `semantic_hints` now drive its MCP

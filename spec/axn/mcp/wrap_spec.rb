@@ -49,6 +49,35 @@ RSpec.describe "Axn::MCP.wrap" do
     expect(tool.annotations_value.read_only_hint).to be true
   end
 
+  describe "tool naming" do
+    it "derives a usable MCP tool name from the wrapped Axn's own class name when name: isn't given" do
+      # Simulates the real gap: passing wrap's return value straight into an array/inline usage,
+      # never assigning it to a constant (which would otherwise give the anonymous class a name).
+      tool = Axn::MCP.wrap(plain_axn, description: "Greets someone")
+
+      expect(tool.name_value).to eq("greet_plainly")
+    end
+
+    it "still honors an explicit name: over the derived default" do
+      tool = Axn::MCP.wrap(plain_axn, description: "Greets someone", name: "custom_name")
+
+      expect(tool.name_value).to eq("custom_name")
+    end
+
+    it "raises when neither name: nor a derivable axn_class.name is available" do
+      truly_anonymous = Class.new do
+        include Axn
+
+        exposes :greeting, type: String
+        def call = expose(greeting: "hi")
+      end
+
+      expect do
+        Axn::MCP.wrap(truly_anonymous, description: "Greets someone")
+      end.to raise_error(ArgumentError, /requires name:/)
+    end
+  end
+
   describe "mcp_text_content resolution" do
     around do |example|
       original = Axn::MCP.config.mcp_text_content

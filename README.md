@@ -386,6 +386,8 @@ If a wrapped Axn needs server-injected data, it must declare the field itself, t
 
 `wrap` also accepts `name:`, `annotations:`, and `mcp_text_content:` (defaulting to the gem-wide `Axn::MCP.config.mcp_text_content`) — `annotations:`/`mcp_text_content:` mirror `Tool.define`'s own options of the same name, but `name:` is `wrap`-specific: `Tool.define` has no equivalent (it takes no `name:` option; a factory tool's MCP name is derived from the anonymous class as usual).
 
+`name:` defaults to a snake-cased version of the wrapped Axn's own class name (e.g. `GreetPlainly` → `"greet_plainly"`) when omitted — this matters if you register the tool inline (`tools: [Axn::MCP.wrap(GreetPlainly, description: "...")]`) rather than assigning the wrapped class to a constant, since an anonymous Ruby class has no name of its own for `wrap` to fall back on. If the wrapped Axn is *also* anonymous with no derivable name, `wrap` raises `ArgumentError` rather than silently registering an unusable, unnamed tool — pass `name:` explicitly in that case.
+
 Unlike `Axn::MCP::Tool`, the generated subclass itself has no dual-mode: its `.call` always returns
 `MCP::Tool::Response`, never a raw `Axn::Result` (that's still true only of the *original*,
 untouched class). For the same reason, the generated subclass has no `.call!` either — a bang
