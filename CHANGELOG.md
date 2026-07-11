@@ -2,6 +2,11 @@
 
 ## 0.2.0
 
+- Documented that schema reflection is best-effort and deliberately biased stricter-than-runtime
+  (a client following the schema never triggers a failed call, but the schema may occasionally be
+  more restrictive than what the tool would actually accept) — per axn PRO-2842 review feedback.
+  `Axn::MCP.wrap` now wires directly to the wrapped Axn's own public `input_schema`/`output_schema`
+  reflection methods rather than reaching past them for the lower-level schema builder.
 - Adopted `axn` core's JSON Schema reflection (`Axn::Reflection::Schema`) and exposed-value
   serialization (`Axn::Reflection::Values`), added in axn PRO-2842. `Axn::MCP::SchemaBuilder` and
   the old `Axn::MCP::Serializer.serialize_exposed`/`.serialize_value` methods are removed — schema

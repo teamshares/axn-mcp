@@ -23,8 +23,12 @@ module Axn
           tool_name(resolved_name)
           description(description)
 
-          input_schema(Axn::Reflection::Schema.build_input(axn_class.internal_field_configs, axn_class.subfield_configs))
-          output_schema(Axn::Reflection::Schema.build_output(axn_class.external_field_configs)) unless axn_class.external_field_configs.empty?
+          # axn_class.input_schema/.output_schema are axn core's own public reflection surface
+          # (Axn::Core::SchemaReflection) -- wiring to those directly, rather than reaching past
+          # them for the lower-level Axn::Reflection::Schema.build_input/build_output the wrapped
+          # Axn's own methods already call, keeps this on the documented entry point.
+          input_schema(axn_class.input_schema)
+          output_schema(axn_class.output_schema) unless axn_class.external_field_configs.empty?
 
           hint_annotations = Axn::MCP::Annotations.annotations_for(axn_class._semantic_hints)
           self.annotations(**(annotations || hint_annotations)) if annotations || hint_annotations.any?

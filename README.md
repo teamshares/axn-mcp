@@ -44,6 +44,17 @@ That's it. The gem automatically:
 `axn` core's own reflection APIs (`Axn::Reflection::Schema` and `Axn::Reflection::Values`) — this
 gem no longer carries its own schema-building or serialization logic.
 
+**Reflection is best-effort and deliberately biased stricter-than-runtime.** Schemas are built
+*statically* from your `expects`/`exposes` declarations — reflection is side-effect-free and never
+runs your validators. Where a value's wire form isn't *provable* from the declared type, the schema
+reflects the conservative answer (untyped, required, or non-null) rather than guess. The net
+contract: **a client that follows the schema will never trigger a failed call; the schema may
+occasionally be more restrictive than what the tool would actually accept at runtime.** Concretely,
+you may see: `type` omitted entirely (an untyped `{}`) when the wire form isn't knowable (e.g. a
+`Numeric`/`Complex` field, or a reader-only/custom-serialized object); `not: { type: "null" }` on a
+required `model:`-generated `_id` (a primary key has no fixed JSON type); `enum: [true]`/`[false]`
+for a `TrueClass`/`FalseClass` field; and `anyOf` for union types.
+
 ## Usage
 
 ### Basic Tool Definition

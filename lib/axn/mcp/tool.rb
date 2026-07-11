@@ -227,7 +227,15 @@ module Axn
           semantic_hints(*(_semantic_hints + [:closed_world] - [:open_world]))
         end
 
-        # Factory-style tool definition for quick one-off tools
+        # Factory-style tool definition for quick one-off tools.
+        #
+        # NOT backed by Axn::Factory.build (axn PRO-2844's ticket called for this, but it can't be
+        # done yet without changing this method's own public contract -- see axn PRO-2878).
+        # Factory.build requires a callable/block; this method's block has always been optional
+        # (a caller may build a bare shell class and define #call separately later), and even when
+        # a block IS given, Factory's own block-handling wraps it as "return a value, we'll expose
+        # it for you" (`instance_exec` + `expose_return_as:`) rather than "the block IS the #call
+        # body, call expose(...) yourself" -- this method's actual, long-standing contract.
         def define(description:, expects: [], exposes: [], annotations: nil, mcp_text_content: NOT_SET, **_opts, &block)
           tool_class = Class.new(self) do
             include Axn unless self < Axn
