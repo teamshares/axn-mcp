@@ -15,11 +15,16 @@ module Axn
       expects :server_context, on: :ambient_context, type: Object, optional: true,
                                description: "MCP server context (injected automatically)"
 
-      # Whether THIS class (or an ancestor, since class_attribute inherits) ever called
-      # `annotations(...)` explicitly -- a class_attribute (not a plain ivar) so it's visible to
-      # subclasses too: a subclass otherwise starts with its own nil `@annotations_value` (mcp's
-      # own `inherited` hook resets it) and no memory of an ancestor's explicit call.
-      class_attribute :_mcp_explicit_annotations, instance_accessor: false, default: false
+      # The raw hash from THIS class's (or an ancestor's, since class_attribute inherits) most
+      # recent explicit `annotations(...)` call, or nil if none. A class_attribute, not a plain
+      # ivar or boolean flag, for two reasons: (1) visibility to subclasses -- a subclass otherwise
+      # starts with its own nil `@annotations_value` (mcp's own `inherited` hook resets it) and no
+      # memory of an ancestor's explicit call; (2) the VALUE itself must inherit, not just a
+      # "was explicit" flag -- an earlier version tracked only a boolean here, which correctly told
+      # a subclass "don't derive from semantic_hints", but then fell through to `super`
+      # (`@annotations_value`), which is nil on the subclass itself, silently losing the base
+      # class's actual explicit annotations instead of inheriting them.
+      class_attribute :_mcp_explicit_annotations_hash, instance_accessor: false, default: nil
 
       # Base error headline, read fresh from config on every failure (a block, not a literal, so
       # Axn::MCP.config.error_headline= takes effect immediately -- no reload/require-order gotcha).
@@ -182,22 +187,25 @@ module Axn
         def annotations(hash = NOT_SET)
           return annotations_value if hash == NOT_SET
 
-          self._mcp_explicit_annotations = true
+          self._mcp_explicit_annotations_hash = hash
           ::MCP::Tool.singleton_class.instance_method(:annotations).bind(self).call(hash)
         end
 
         # Default MCP annotations from axn core's generic `semantic_hints` DSL -- but only when
         # `annotations(...)` was never called explicitly (on this class OR an ancestor; see
-        # `_mcp_explicit_annotations` above). Derives lazily, on every read, from the FULL current
+        # `_mcp_explicit_annotations_hash` above). Rebuilds from the stored hash (rather than
+        # falling through to `super`/`@annotations_value`) so an ancestor's explicit call is
+        # visible on a subclass that never overrides it -- `@annotations_value` itself is NOT
+        # inherited (`::MCP::Tool`'s own `inherited` hook resets it to nil for every subclass), but
+        # `_mcp_explicit_annotations_hash` (a class_attribute) is, so this stays correct at any
+        # depth. Derives semantic-hints defaults lazily, on every read, from the FULL current
         # `_semantic_hints` list (not an incremental patch) -- rather than eagerly inside
         # `semantic_hints`/`open_world`/`closed_world` -- so it's idempotent under repeated/
         # overlapping hint declarations (e.g. open_world then closed_world nets only closed_world's
         # annotation), AND so a subclass that inherits `_semantic_hints` from a base class without
-        # redeclaring them still gets the right annotations: `::MCP::Tool`'s own `inherited` hook
-        # resets @annotations_value to nil for every subclass, so eagerly setting it only on the
-        # class where `semantic_hints` happened to be called would leave a silent subclass stale.
+        # redeclaring them still gets the right annotations.
         def annotations_value
-          return super if _mcp_explicit_annotations
+          return ::MCP::Tool::Annotations.new(**_mcp_explicit_annotations_hash) if _mcp_explicit_annotations_hash
 
           mapped = Axn::MCP::Annotations.annotations_for(_semantic_hints)
           # Empty either because no hints are declared, or because every declared hint (e.g. one a

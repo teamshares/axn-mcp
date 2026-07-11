@@ -1218,6 +1218,18 @@ RSpec.describe Axn::MCP::Tool do
       expect(subclass.annotations_value.destructive_hint).to be false
     end
 
+    it "applies a base class's explicit annotations(...) to subclasses that never redeclare them" do
+      base = Class.new(Axn::MCP::Tool) do
+        annotations(title: "Custom Title", read_only_hint: true)
+        def call = nil
+      end
+      subclass = Class.new(base)
+
+      expect(subclass.annotations_value).not_to be_nil
+      expect(subclass.annotations_value.title).to eq("Custom Title")
+      expect(subclass.annotations_value.read_only_hint).to be true
+    end
+
     it "agrees with .annotations (not just .annotations_value), since MCP::Server's own protocol-version validation reads .annotations" do
       tool = Class.new(Axn::MCP::Tool) do
         semantic_hints :read_only
