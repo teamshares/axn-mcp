@@ -130,34 +130,37 @@ module Axn
           raise result.exception
         end
 
-        # Convenience DSL for annotations
-        # See: https://github.com/modelcontextprotocol/ruby-sdk#tool-annotations
-        #
-        # Available annotations:
-        #   destructive_hint: true/false - Indicates if tool performs destructive operations (default: true)
-        #   idempotent_hint: true/false - Indicates if tool's operations are idempotent (default: false)
-        #   open_world_hint: true/false - Indicates if tool operates in open world context (default: true)
-        #   read_only_hint: true/false - Indicates if tool only reads data (default: false)
-        #   title: "string" - Human-readable title for the tool
-
+        # Deprecated convenience DSL for annotations, kept only for back-compat -- prefer
+        # `semantic_hints`/`open_world`/`closed_world` below. These used to call `annotations(...)`
+        # directly, independent of `semantic_hints` entirely, which meant `.semantic_hints` never
+        # reflected a bang-method call. Now thin aliases over `semantic_hints`, so both stay
+        # coherent; mutually exclusive where the old full-replace `annotations()` calls implied it
+        # (read_only!/destructive!, open_world!/closed_world!), additive where it didn't
+        # (idempotent!, same as before). Because these now route through `semantic_hints`, an
+        # explicit `annotations(...)` call still wins over them too, same as the non-bang methods.
         def read_only!
-          annotations(read_only_hint: true, destructive_hint: false)
+          Axn::MCP.deprecator.warn("`read_only!` is deprecated and will be removed in a future release. Use `semantic_hints :read_only` instead.")
+          semantic_hints(*(_semantic_hints + [:read_only] - [:destructive]))
         end
 
         def destructive!
-          annotations(destructive_hint: true, read_only_hint: false)
+          Axn::MCP.deprecator.warn("`destructive!` is deprecated and will be removed in a future release. Use `semantic_hints :destructive` instead.")
+          semantic_hints(*(_semantic_hints + [:destructive] - [:read_only]))
         end
 
         def idempotent!
-          annotations(idempotent_hint: true)
+          Axn::MCP.deprecator.warn("`idempotent!` is deprecated and will be removed in a future release. Use `semantic_hints :idempotent` instead.")
+          semantic_hints(*(_semantic_hints | [:idempotent]))
         end
 
         def open_world!
-          annotations(open_world_hint: true)
+          Axn::MCP.deprecator.warn("`open_world!` is deprecated and will be removed in a future release. Use `open_world` instead.")
+          semantic_hints(*(_semantic_hints + [:open_world] - [:closed_world]))
         end
 
         def closed_world!
-          annotations(open_world_hint: false)
+          Axn::MCP.deprecator.warn("`closed_world!` is deprecated and will be removed in a future release. Use `closed_world` instead.")
+          semantic_hints(*(_semantic_hints + [:closed_world] - [:open_world]))
         end
 
         # Tracks whether `annotations(...)` was ever called explicitly (see the class_attribute

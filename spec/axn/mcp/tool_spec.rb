@@ -1042,6 +1042,84 @@ RSpec.describe Axn::MCP::Tool do
       end
     end
 
+    describe "deprecation: bang methods are thin aliases over semantic_hints" do
+      it "warns with a message pointing at the semantic_hints replacement, for each bang method" do
+        expect(Axn::MCP.deprecator).to receive(:warn).with(/read_only!.*semantic_hints :read_only/)
+        Class.new(described_class) { read_only! }
+
+        expect(Axn::MCP.deprecator).to receive(:warn).with(/destructive!.*semantic_hints :destructive/)
+        Class.new(described_class) { destructive! }
+
+        expect(Axn::MCP.deprecator).to receive(:warn).with(/idempotent!.*semantic_hints :idempotent/)
+        Class.new(described_class) { idempotent! }
+
+        expect(Axn::MCP.deprecator).to receive(:warn).with(/open_world!.*open_world/)
+        Class.new(described_class) { open_world! }
+
+        expect(Axn::MCP.deprecator).to receive(:warn).with(/closed_world!.*closed_world/)
+        Class.new(described_class) { closed_world! }
+      end
+
+      before { allow(Axn::MCP.deprecator).to receive(:warn) }
+
+      it "read_only! also updates .semantic_hints and is mutually exclusive with destructive!" do
+        tool = Class.new(described_class) do
+          destructive!
+          read_only!
+        end
+
+        expect(tool.semantic_hints).to include(:read_only)
+        expect(tool.semantic_hints).not_to include(:destructive)
+        expect(tool.annotations_value.read_only_hint).to be true
+        expect(tool.annotations_value.destructive_hint).to be false
+      end
+
+      it "destructive! also updates .semantic_hints and is mutually exclusive with read_only!" do
+        tool = Class.new(described_class) do
+          read_only!
+          destructive!
+        end
+
+        expect(tool.semantic_hints).to include(:destructive)
+        expect(tool.semantic_hints).not_to include(:read_only)
+        expect(tool.annotations_value.destructive_hint).to be true
+        expect(tool.annotations_value.read_only_hint).to be false
+      end
+
+      it "idempotent! also updates .semantic_hints and composes with read_only! (unlike the old full-replace behavior)" do
+        tool = Class.new(described_class) do
+          read_only!
+          idempotent!
+        end
+
+        expect(tool.semantic_hints).to include(:read_only, :idempotent)
+        expect(tool.annotations_value.read_only_hint).to be true
+        expect(tool.annotations_value.idempotent_hint).to be true
+      end
+
+      it "open_world! also updates .semantic_hints and is mutually exclusive with closed_world!" do
+        tool = Class.new(described_class) do
+          closed_world!
+          open_world!
+        end
+
+        expect(tool.semantic_hints).to include(:open_world)
+        expect(tool.semantic_hints).not_to include(:closed_world)
+        expect(tool.annotations_value.open_world_hint).to be true
+      end
+
+      it "closed_world! also updates .semantic_hints and is mutually exclusive with open_world!" do
+        tool = Class.new(described_class) do
+          open_world!
+          closed_world!
+        end
+
+        expect(tool.semantic_hints).to include(:closed_world)
+        expect(tool.semantic_hints).not_to include(:open_world)
+        expect(tool.annotations_value.open_world_hint).to be false
+      end
+    end
+
     describe "using annotations directly" do
       it "supports all MCP annotation options" do
         tool = Class.new(described_class) do

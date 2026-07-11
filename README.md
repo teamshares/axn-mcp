@@ -278,24 +278,41 @@ Generates:
 
 ### Annotations
 
-Use convenience methods or the `annotations` DSL:
+Declare `axn` core's generic `semantic_hints` DSL (`semantic_hints :read_only, :idempotent, ...`) and this gem maps them to MCP annotations automatically. This gem registers `:open_world`/`:closed_world` as additional semantic hints (via `Axn.extension_config.register_semantic_hint` — no core change needed for MCP-only vocabulary):
+
+| Declared `semantic_hints` | Default annotation      |
+| -------------------------- | ------------------------ |
+| `:read_only`                | `read_only_hint: true`, `destructive_hint: false` |
+| `:idempotent`               | `idempotent_hint: true`  |
+| `:destructive`              | `destructive_hint: true` |
+| `:open_world`               | `open_world_hint: true`  |
+| `:closed_world`             | `open_world_hint: false` |
 
 ```ruby
 class ReadOnlyTool < Axn::MCP::Tool
   description "Fetch data without side effects"
-  read_only!
+  semantic_hints :read_only, :closed_world
+  # annotations now include read_only_hint: true, destructive_hint: false, open_world_hint: false
 
   # ...
 end
+```
 
+`open_world`/`closed_world` (no bang) are shorthand for declaring just that one hint:
+
+```ruby
 class DangerousTool < Axn::MCP::Tool
   description "Delete all the things"
-  destructive!
-  idempotent!
+  semantic_hints :destructive, :idempotent
+  open_world # equivalent to: semantic_hints(*(semantic_hints + [:open_world]))
 
   # ...
 end
+```
 
+For anything `semantic_hints` doesn't cover (a custom `title:`, or an annotation with no corresponding hint), set `annotations(...)` directly:
+
+```ruby
 class CustomAnnotations < Axn::MCP::Tool
   annotations(
     read_only_hint: true,
@@ -307,41 +324,9 @@ class CustomAnnotations < Axn::MCP::Tool
 end
 ```
 
-Available shortcuts:
+An explicit `annotations(...)` call always wins over hint-derived defaults, on this class or any ancestor. `semantic_hints`-derived annotations are re-derived from the full set of declared hints each time (so declaring `:open_world` and later `:closed_world` ends with only `open_world_hint: false` applied, not both), and a subclass that inherits `semantic_hints` from a base class without redeclaring them still gets the right annotations.
 
-
-| Method          | Effect                                            |
-| --------------- | ------------------------------------------------- |
-| `read_only!`    | `read_only_hint: true`, `destructive_hint: false` |
-| `destructive!`  | `destructive_hint: true`, `read_only_hint: false` |
-| `idempotent!`   | `idempotent_hint: true`                           |
-| `open_world!`   | `open_world_hint: true`                           |
-| `closed_world!` | `open_world_hint: false`                          |
-
-
-### Annotations from `semantic_hints`
-
-`axn` core's generic `semantic_hints` DSL (`semantic_hints :read_only, :idempotent, ...`) doubles as a source of default MCP annotations. This gem registers `:open_world`/`:closed_world` as additional semantic hints (via `Axn.extension_config.register_semantic_hint` — no core change needed for MCP-only vocabulary) and maps declared hints to annotations automatically:
-
-| Declared `semantic_hints` | Default annotation           |
-| ------------------------- | ----------------------------- |
-| `:read_only`               | `read_only_hint: true`        |
-| `:idempotent`              | `idempotent_hint: true`       |
-| `:destructive`             | `destructive_hint: true`      |
-| `:open_world`              | `open_world_hint: true`       |
-| `:closed_world`            | `open_world_hint: false`      |
-
-```ruby
-class ReadOnlyTool < Axn::MCP::Tool
-  description "Fetch data without side effects"
-  semantic_hints :read_only, :closed_world
-  # annotations now include read_only_hint: true, open_world_hint: false
-
-  # ...
-end
-```
-
-This mapping only applies when the class hasn't called `annotations(...)` explicitly — an explicit `annotations(...)` call always wins over hint-derived defaults, and is re-derived from the full set of declared hints each time (so declaring `:open_world` and later `:closed_world` ends with only `open_world_hint: false` applied, not both). The bang methods (`read_only!`, `destructive!`, `idempotent!`, `open_world!`, `closed_world!`) remain independent, unchanged convenience methods that call `annotations(...)` directly — they're unaffected by, and don't feed into, the `semantic_hints`-driven defaults.
+> **Deprecated:** `read_only!`/`destructive!`/`idempotent!`/`open_world!`/`closed_world!` (bang methods) still work, as thin aliases over `semantic_hints` — but emit a deprecation warning and will be removed in a future release. Prefer `semantic_hints`/`open_world`/`closed_world` directly, as shown above.
 
 
 ### Factory-Style Definition

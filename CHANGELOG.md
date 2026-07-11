@@ -42,8 +42,15 @@
   needed to add MCP-spec-only vocabulary. A class's declared `semantic_hints` now drive its MCP
   annotations by default (`:read_only`/`:idempotent`/`:destructive`/`:open_world`/`:closed_world` →
   the matching `*_hint`), unless the class calls `annotations(...)` explicitly, which always wins.
-  `read_only!`/`destructive!`/`idempotent!`/`open_world!`/`closed_world!` remain as unchanged,
-  independent convenience methods.
+- **Deprecated** `read_only!`/`destructive!`/`idempotent!`/`open_world!`/`closed_world!`. They still
+  work — now as thin aliases over `semantic_hints` (previously an independent mechanism that never
+  updated `.semantic_hints` at all) — but emit a deprecation warning via a dedicated
+  `Axn::MCP.deprecator` (an `ActiveSupport::Deprecation` instance; a consuming Rails app can register
+  it with `Rails.application.deprecators` to govern its behavior like its own deprecations) and will
+  be removed in a future release. `read_only!`/`destructive!` and `open_world!`/`closed_world!` are
+  still mutually exclusive with each other, matching their old full-replace behavior;
+  `idempotent!` composes with either, same as before. Prefer `semantic_hints`/`open_world`/
+  `closed_world` directly going forward.
 - Requires an `axn` version that ships `Axn::Core::SchemaReflection`, `Axn::Core::SemanticHints`,
   `Axn::Core::AmbientContext`, `Axn::ExtensionConfig#register_semantic_hint`, and
   `Axn::Reflection::{Schema,Values}` (axn PRO-2842). As of this writing, axn has no tagged release
