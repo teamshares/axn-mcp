@@ -41,12 +41,11 @@ module Axn
 
         def input_schema(value = NOT_SET)
           if value != NOT_SET
-            # Explicit-arg super, not bare `super`/`super()`: `include Axn` puts axn core's own
-            # Axn::Core::SchemaReflection::ClassMethods#input_schema (a ZERO-arg reflection reader,
-            # unrelated to this manual-override path) ahead of ::MCP::Tool's in the singleton ancestor
-            # chain, so a forwarding `super` would hit the wrong, arity-0 method. Bind directly to
-            # ::MCP::Tool's own setter to skip over it.
-            ::MCP::Tool.singleton_class.instance_method(:input_schema).bind(self).call(value)
+            # Plain `super` (not a bind-trick): axn core's Axn::Core::MethodShadowing (axn PRO-2875)
+            # now defers to a pre-existing same-named method on a non-axn-core ancestor, so
+            # Axn::Core::SchemaReflection::ClassMethods#input_schema is never extended onto this
+            # class at all -- ::MCP::Tool's own setter is the only one in the ancestor chain.
+            super
           elsif @input_schema_value
             @input_schema_value
           else
@@ -65,8 +64,8 @@ module Axn
 
         def output_schema(value = NOT_SET)
           if value != NOT_SET
-            # See input_schema's comment: skip axn core's zero-arg SchemaReflection#output_schema.
-            ::MCP::Tool.singleton_class.instance_method(:output_schema).bind(self).call(value)
+            # See input_schema's comment: plain `super` is safe here too, same reason.
+            super
           elsif @output_schema_value
             @output_schema_value
           elsif external_field_configs.empty?
@@ -85,15 +84,11 @@ module Axn
           output_schema
         end
 
-        # axn core's Naming module (`include Axn`) also defines a class-level `description`, storing into
-        # its own `_axn_description` -- unrelated to MCP transport, but it sits ahead of ::MCP::Tool's own
-        # accessor in the singleton ancestor chain and silently shadows it. Bind directly to ::MCP::Tool's
-        # own method (same technique as input_schema/output_schema above) so `description "..."` keeps
-        # reaching @description_value, which `to_h` actually serializes to the MCP client.
-        def description(value = NOT_SET)
-          method = ::MCP::Tool.singleton_class.instance_method(:description).bind(self)
-          value == NOT_SET ? method.call : method.call(value)
-        end
+        # No override needed here anymore: axn core's Naming module (`include Axn`) used to define
+        # its own class-level `description` (storing into `_axn_description`, unrelated to MCP
+        # transport) that shadowed ::MCP::Tool's own accessor -- fixed upstream by axn's
+        # Axn::Core::MethodShadowing (PRO-2875), which now defers to ::MCP::Tool's pre-existing
+        # `description` instead of extending its own. Plain inheritance handles it.
 
         def to_h
           input_schema
@@ -178,12 +173,15 @@ module Axn
         # `MCP::Server`'s own protocol-version validation reads `tool.annotations` (this method),
         # while serialization reads `tool.annotations_value` -- if only the latter derived from
         # semantic_hints, a hint-derived annotation could be emitted without ever passing that
-        # validation. The setter path can't use plain `super`/`super()` either: our own `NOT_SET`
-        # sentinel (defined above, in this class's `class << self`) is a different object from
-        # `::MCP::Tool`'s own internal `NOT_SET`, so forwarding it as `hash` would make `::MCP::Tool`
-        # wrongly treat "no argument given" as "given this literal Object" and crash trying to
-        # build `Annotations.new(**that_object)`. Bind directly to `::MCP::Tool`'s own setter
-        # instead (same technique as input_schema/output_schema/description above).
+        # validation. The setter path can't use plain `super`/`super()` either -- unlike
+        # input_schema/output_schema above (whose shadowing is now fixed upstream by axn's
+        # Axn::Core::MethodShadowing, PRO-2875), this one is unrelated to that: axn core has never
+        # defined an `annotations` method at all. This is purely a `NOT_SET` sentinel mismatch --
+        # our own `NOT_SET` (defined above, in this class's `class << self`) is a different object
+        # from `::MCP::Tool`'s own internal `NOT_SET`, so forwarding it as `hash` would make
+        # `::MCP::Tool` wrongly treat "no argument given" as "given this literal Object" and crash
+        # trying to build `Annotations.new(**that_object)`. Bind directly to `::MCP::Tool`'s own
+        # setter instead to sidestep the sentinel mismatch.
         def annotations(hash = NOT_SET)
           return annotations_value if hash == NOT_SET
 

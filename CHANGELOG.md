@@ -51,10 +51,18 @@
   still mutually exclusive with each other, matching their old full-replace behavior;
   `idempotent!` composes with either, same as before. Prefer `semantic_hints`/`open_world`/
   `closed_world` directly going forward.
+- Removed the `::MCP::Tool.singleton_class.instance_method(:x).bind(self).call(...)` workarounds
+  for `Axn::MCP::Tool#input_schema`/`#output_schema`, and the `#description` override entirely —
+  axn's new `Axn::Core::MethodShadowing` (axn PRO-2875, filed from this gem's own PRO-2844 work) now
+  defers to a pre-existing same-named method on a non-axn-core ancestor, so `include Axn` no longer
+  shadows `::MCP::Tool`'s own `description`/`input_schema`/`output_schema` in the first place; plain
+  `super`/inheritance works again. The `#annotations` bind-trick remains — unrelated to this fix, a
+  `NOT_SET` sentinel mismatch between this gem's own sentinel and `::MCP::Tool`'s internal one, not
+  an axn-core shadowing issue.
 - Requires an `axn` version that ships `Axn::Core::SchemaReflection`, `Axn::Core::SemanticHints`,
-  `Axn::Core::AmbientContext`, `Axn::ExtensionConfig#register_semantic_hint`, and
-  `Axn::Reflection::{Schema,Values}` (axn PRO-2842). As of this writing, axn has no tagged release
-  with these primitives yet; this gem's Gemfile currently tracks `axn` git `main`
+  `Axn::Core::AmbientContext`, `Axn::Core::MethodShadowing`, `Axn::ExtensionConfig#register_semantic_hint`, and
+  `Axn::Reflection::{Schema,Values}` (axn PRO-2842 / PRO-2875). As of this writing, axn has no tagged
+  release with these primitives yet; this gem's Gemfile currently tracks `axn` git `main`
   (`github: "teamshares/axn", branch: "main"`) pending an axn release.
 
 ## 0.1.1

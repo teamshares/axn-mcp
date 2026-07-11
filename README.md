@@ -93,6 +93,17 @@ Axn types map to JSON Schema types:
 | `Date`             | `string` (format: `date`)      |
 | `DateTime`, `Time` | `string` (format: `date-time`) |
 
+### Coercing loosely-typed inbound values with `coerce:`
+
+An LLM (or a client that stringifies its JSON) doesn't always send a value in the exact Ruby type your `expects` field declares — a `Date`/`Integer`/`Float`/`Symbol`/`Time`/`DateTime` field can arrive as a `String`. Add the `coerce: <Type>` shorthand (or `type: { klass: <Type>, coerce: true }` when you also need other type options alongside it — `coerce:` can't be combined with a sibling top-level `type:`) to have `axn` core convert a well-formed string to the declared type *before* validation runs:
+
+```ruby
+expects :starts_on, coerce: Date                          # "2026-01-15" -> a Date
+expects :count,     type: { klass: Integer, coerce: true } # "42" -> 42
+```
+
+Coercion only affects top-level `expects` fields (not `exposes`, subfields, or `shape:` members), and only converts a non-blank `String` input. An unparseable string doesn't silently pass through to a generic type-mismatch error — it fails validation with a dedicated message: `"<field> could not be coerced to a <Type>"`. `inputSchema`/`outputSchema` output is identical with or without `coerce:` — only accepted inbound values change, not the field's advertised JSON type.
+
 
 ### Typed member contracts with `shape:`
 
