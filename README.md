@@ -510,8 +510,9 @@ By default, successful responses contain a text block with the JSON-serialized `
 ## Requirements
 
 - Ruby >= 3.2.1
-- [axn](https://github.com/teamshares/axn) >= 0.1.0-alpha.4.3
-- [mcp](https://github.com/modelcontextprotocol/ruby-sdk) >= 0.4
+- [axn](https://github.com/teamshares/axn) >= 0.1.0-alpha.4.3, < 0.2.0
+- [mcp](https://github.com/modelcontextprotocol/ruby-sdk) >= 0.4, < 1.0 — this range spans versions with
+  meaningfully different `server_context` shapes at the transport layer (see [Server Context](#server-context)); this gem is written to be correct across all of it, not just the version you happen to have installed locally.
 
 ## Development
 
