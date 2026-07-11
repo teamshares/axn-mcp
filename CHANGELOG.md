@@ -67,10 +67,17 @@
   `super`/inheritance works again. The `#annotations` bind-trick remains — unrelated to this fix, a
   `NOT_SET` sentinel mismatch between this gem's own sentinel and `::MCP::Tool`'s internal one, not
   an axn-core shadowing issue.
+- Removed `Axn::MCP::FieldDeclarations` entirely (no external references found) — `Tool.define` now
+  calls axn core's new public `Axn::FieldDeclarations.hydrate` (axn PRO-2878) directly instead of
+  duplicating the identical `expects:`/`exposes:` declaration-format normalization. `Axn::Factory`'s
+  own "must provide a callable/block" contract is intentionally unchanged (building a callable into
+  an Axn is its whole purpose); `Tool.define` still isn't backed by `Axn::Factory.build` itself, and
+  now isn't expected to be — the shared piece both needed was this normalizer, not the factory.
 - Requires an `axn` version that ships `Axn::Core::SchemaReflection`, `Axn::Core::SemanticHints`,
-  `Axn::Core::AmbientContext`, `Axn::Core::MethodShadowing`, `Axn::ExtensionConfig#register_semantic_hint`, and
-  `Axn::Reflection::{Schema,Values}` (axn PRO-2842 / PRO-2875). As of this writing, axn has no tagged
-  release with these primitives yet; this gem's Gemfile currently tracks `axn` git `main`
+  `Axn::Core::AmbientContext`, `Axn::Core::MethodShadowing`, `Axn::FieldDeclarations`,
+  `Axn::ExtensionConfig#register_semantic_hint`, and `Axn::Reflection::{Schema,Values}` (axn
+  PRO-2842 / PRO-2875 / PRO-2878). As of this writing, axn has no tagged release with these
+  primitives yet; this gem's Gemfile currently tracks `axn` git `main`
   (`github: "teamshares/axn", branch: "main"`) pending an axn release.
 
 ## 0.1.1

@@ -33,7 +33,6 @@ end
 # free, but the extend must happen first.)
 require_relative "mcp/annotations"
 require_relative "mcp/serializer"
-require_relative "mcp/field_declarations"
 require_relative "mcp/invocation"
 require_relative "mcp/tool"
 require_relative "mcp/wrap"

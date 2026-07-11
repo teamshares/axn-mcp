@@ -229,23 +229,27 @@ module Axn
 
         # Factory-style tool definition for quick one-off tools.
         #
-        # NOT backed by Axn::Factory.build (axn PRO-2844's ticket called for this, but it can't be
-        # done yet without changing this method's own public contract -- see axn PRO-2878).
-        # Factory.build requires a callable/block; this method's block has always been optional
-        # (a caller may build a bare shell class and define #call separately later), and even when
-        # a block IS given, Factory's own block-handling wraps it as "return a value, we'll expose
-        # it for you" (`instance_exec` + `expose_return_as:`) rather than "the block IS the #call
-        # body, call expose(...) yourself" -- this method's actual, long-standing contract.
+        # Not backed by Axn::Factory.build -- Factory.build requires a callable/block, but this
+        # method's own block has always been optional (a caller may build a bare shell class and
+        # define #call separately later), and even when a block IS given, Factory's own
+        # block-handling wraps it as "return a value, we'll expose it for you" (`instance_exec` +
+        # `expose_return_as:`) rather than "the block IS the #call body, call expose(...)
+        # yourself" -- this method's actual, long-standing contract. That mismatch is intentional
+        # and permanent on axn's side (axn PRO-2878): Factory's "must provide a callable" contract
+        # stays as-is, since building a callable into an Axn is its whole purpose. Instead, axn
+        # extracted just the shared piece both this method and Factory needed -- the expects:/
+        # exposes: declaration-format normalizer -- into a public `Axn::FieldDeclarations.hydrate`
+        # (axn PRO-2878), which this method now calls directly rather than duplicating it.
         def define(description:, expects: [], exposes: [], annotations: nil, mcp_text_content: NOT_SET, **_opts, &block)
           tool_class = Class.new(self) do
             include Axn unless self < Axn
           end
 
-          FieldDeclarations.hydrate(expects).each do |field, field_opts|
+          Axn::FieldDeclarations.hydrate(expects).each do |field, field_opts|
             tool_class.expects(field, **field_opts)
           end
 
-          FieldDeclarations.hydrate(exposes).each do |field, field_opts|
+          Axn::FieldDeclarations.hydrate(exposes).each do |field, field_opts|
             tool_class.exposes(field, **field_opts)
           end
 
