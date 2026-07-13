@@ -356,7 +356,7 @@ RSpec.describe "MCP Server Integration", type: :integration do
         expose value: 10
       end
       # When mcp_text_content is :message we use result.success; without success() DSL that may be default Axn message
-      expect(message_tool.resolved_mcp_text_content).to eq(:message)
+      expect(message_tool.mcp_text_content).to eq(:message)
     end
   end
 

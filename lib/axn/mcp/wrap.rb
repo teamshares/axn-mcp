@@ -35,7 +35,7 @@ module Axn
 
           define_singleton_method(:call) do |**kwargs|
             # Resolved fresh on every call (mcp_text_content || Axn::MCP.config...), not captured
-            # once at wrap-time, so this matches Axn::MCP::Tool#call's resolved_mcp_text_content
+            # once at wrap-time, so this matches Axn::MCP::Tool#call's own mcp_text_content read
             # guarantee: a gem-wide config change takes effect immediately, even for tools already
             # wrapped before the change.
             Axn::MCP::Invocation.perform(axn_class, kwargs, text_content: mcp_text_content || Axn::MCP.config.mcp_text_content)

@@ -105,7 +105,7 @@ module Axn
           # parsed JSON without symbolizing first (the same case Invocation.perform itself
           # defends against) would otherwise fall through to direct-Axn mode and return the wrong
           # response type even though the caller clearly intended an MCP-mode call.
-          return Invocation.perform(self, kwargs, text_content: resolved_mcp_text_content) if kwargs.key?(:server_context) || kwargs.key?("server_context")
+          return Invocation.perform(self, kwargs, text_content: mcp_text_content) if kwargs.key?(:server_context) || kwargs.key?("server_context")
 
           # Direct-Axn mode still needs the same "no Current leakage" guarantee Invocation.perform
           # gives the MCP-mode branch above: server_context is declared on: :ambient_context, so

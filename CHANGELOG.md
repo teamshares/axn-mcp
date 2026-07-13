@@ -77,16 +77,22 @@
   PRO-2880), so a base Axn can be configured for this gem and for another adapter (e.g. an
   `axn-ruby_llm` gem declaring its own `config_namespace`) independently on the same class, via
   `configure(:mcp) { |c| c.mcp_text_content = :message }` / `configure(:other_adapter) { |c| ... }`.
-  Purely additive — the flat `mcp_text_content(...)`/`resolved_mcp_text_content` accessors and
-  gem-wide `Axn::MCP.config.mcp_text_content` are unchanged; this only adds the namespaced
+  Purely additive — the flat `mcp_text_content(...)` accessor and gem-wide
+  `Axn::MCP.config.mcp_text_content` are unchanged; this only adds the namespaced
   `configure`/`axn_configure` DSL as an alternate way to set the same per-tool override.
+- **[BREAKING]** `resolved_mcp_text_content` is removed — axn core removed `resolved_<name>`
+  entirely (axn PRO-2888), since it was byte-for-byte identical to the no-arg `mcp_text_content`
+  reader. Read `SomeTool.mcp_text_content` instead of `SomeTool.resolved_mcp_text_content`; the
+  per-tool setter form (`mcp_text_content :message`) and gem-wide
+  `Axn::MCP.config.mcp_text_content` are unaffected. This gem never used `raw_mcp_text_content`
+  (also renamed upstream, to `mcp_text_content_override`), so that rename needs no local change.
 - Requires an `axn` version that ships `Axn::Core::SchemaReflection`, `Axn::Core::SemanticHints`,
   `Axn::Core::AmbientContext`, `Axn::Core::MethodShadowing`, `Axn::FieldDeclarations`,
   `Axn::ExtensionConfig#register_semantic_hint`, `Axn::Reflection::{Schema,Values}`, and
-  `Axn::Configurable`'s namespaced `config_namespace` (axn PRO-2842 / PRO-2875 / PRO-2878 /
-  PRO-2880). As of this writing, axn has no tagged release with these primitives yet; this gem's
-  Gemfile currently tracks `axn` git `main` (`github: "teamshares/axn", branch: "main"`) pending an
-  axn release.
+  `Axn::Configurable`'s namespaced `config_namespace` plus the `resolved_<name>`
+  removal/`raw_<name>` rename (axn PRO-2842 / PRO-2875 / PRO-2878 / PRO-2880 / PRO-2888). As of
+  this writing, axn has no tagged release with these primitives yet; this gem's Gemfile currently
+  tracks `axn` git `main` (`github: "teamshares/axn", branch: "main"`) pending an axn release.
 
 ## 0.1.1
 
