@@ -64,4 +64,39 @@ RSpec.describe "Axn::MCP configuration" do
       expect(Axn::MCP.config.error_headline).to eq("Tool call failed")
     end
   end
+
+  describe "namespaced per-class config (axn PRO-2880)" do
+    it "resolves a per-tool override set via the namespaced configure(:mcp) DSL, not just the flat setter" do
+      tool = Class.new(Axn::MCP::Tool) do
+        def self.name = "NamespacedConfigProbe"
+        def call = nil
+      end
+
+      tool.configure(:mcp) { |c| c.mcp_text_content = :message }
+
+      expect(tool.resolved_mcp_text_content).to eq(:message)
+    end
+
+    it "lets a base Axn be configured separately for axn-mcp and another adapter composed on the same class" do
+      fake_ruby_llm_adapter = Module.new do
+        extend Axn::Configurable
+
+        config_namespace :ruby_llm
+        setting :temperature, default: 0.0, overridable: true
+      end
+
+      tool = Class.new(Axn::MCP::Tool) do
+        include fake_ruby_llm_adapter.overrides
+
+        def self.name = "MultiAdapterProbe"
+        def call = nil
+      end
+
+      tool.configure(:mcp) { |c| c.mcp_text_content = :message }
+      tool.configure(:ruby_llm) { |c| c.temperature = 0.2 }
+
+      expect(tool.resolved_mcp_text_content).to eq(:message)
+      expect(tool.resolved_temperature).to eq(0.2)
+    end
+  end
 end

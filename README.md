@@ -516,6 +516,8 @@ For complete server setup, transport options, and advanced configuration, see th
 
 By default, successful responses contain a text block with the JSON-serialized `structured_content` (a SHOULD per [MCP spec](https://modelcontextprotocol.io/specification/draft/server/tools#structured-content)). To use the Axn success message instead, set **central config** once (`Axn::MCP.config.mcp_text_content = :message`) or override **per tool** with `mcp_text_content :message`. Valid values are `:structured` (default) and `:message`; per-tool overrides config.
 
+Per-tool overrides can also be set through axn core's namespaced `configure`/`axn_configure` DSL: `MyTool.configure(:mcp) { |c| c.mcp_text_content = :message }` (equivalent to `mcp_text_content :message`). This is the same base Axn a class might also compose with another adapter (e.g. an `axn-ruby_llm` gem) via its own `config_namespace` — each adapter's settings live in their own namespace, so `configure(:mcp)` and `configure(:other_adapter)` on the same class never collide.
+
 ## Requirements
 
 - Ruby >= 3.2.1

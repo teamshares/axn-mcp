@@ -12,6 +12,8 @@ module Axn
   module MCP
     extend Axn::Configurable
 
+    config_namespace :mcp
+
     class SchemaError < StandardError; end
 
     setting :mcp_text_content, default: :structured, one_of: %i[structured message], overridable: true
