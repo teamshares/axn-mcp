@@ -2,6 +2,17 @@
 
 ## 0.2.0
 
+- `Axn::MCP.wrap` accepts `title:`/`icons:`/`meta:` kwargs, mirroring `::MCP::Tool`'s own class
+  methods of the same name — a wrapped Axn has no class body of its own in which to declare them.
+  A class subclassing `Axn::MCP::Tool` already had these for free via plain inheritance (no
+  shadowing — axn core touches neither name); documented that path too, plus the new `wrap` kwargs
+  — per PRO-2879 item 1.
+- Documented `MCP::ServerContext`'s richer capabilities (`#report_progress`, `#cancelled?`, etc.) —
+  reachable today with no gem changes, but previously discoverable only by reading the `mcp` gem's
+  own source — per PRO-2879 item 2.
+- Documented in the README's intro that this gem is scoped to MCP Tools only — Resources, Resource
+  Templates, and Prompts are `MCP::Server` concepts this gem doesn't adapt an Axn into — per
+  PRO-2879 item 3.
 - Documented that schema reflection is best-effort and deliberately biased stricter-than-runtime
   (a client following the schema never triggers a failed call, but the schema may occasionally be
   more restrictive than what the tool would actually accept) — per axn PRO-2842 review feedback.

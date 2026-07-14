@@ -348,6 +348,20 @@ RSpec.describe Axn::MCP::Tool do
     end
   end
 
+  describe "title/icons/meta" do
+    it "works via plain ::MCP::Tool inheritance, undocumented but unshadowed by include Axn" do
+      tool = Class.new(described_class) do
+        title "My Tool"
+        icons [{ src: "https://example.com/icon.png" }]
+        meta({ version: "1.0" })
+      end
+
+      expect(tool.title).to eq("My Tool")
+      expect(tool.icons).to eq([{ src: "https://example.com/icon.png" }])
+      expect(tool.meta).to eq({ version: "1.0" })
+    end
+  end
+
   describe ".input_schema" do
     it "returns auto-generated InputSchema" do
       tool = Class.new(described_class) do

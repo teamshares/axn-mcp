@@ -2,6 +2,8 @@
 
 Build [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) tools using [Axn](https://github.com/teamshares/axn)'s declarative `expects`/`exposes` contract. This gem wraps the official [MCP Ruby SDK](https://github.com/modelcontextprotocol/ruby-sdk) and auto-generates JSON schemas from your Axn field declarations.
 
+This gem is scoped to MCP **Tools** only. `MCP::Server` also supports `resources`, `resource_templates`, and `prompts` as first-class concepts — `Axn::MCP::Tool`/`Axn::MCP.wrap` don't adapt an Axn into any of those, and there's no `Axn::MCP.wrap_as_resource` or equivalent. If you need those, register them with `MCP::Server` directly per the [MCP Ruby SDK documentation](https://github.com/modelcontextprotocol/ruby-sdk).
+
 ## Installation
 
 Add to your Gemfile:
@@ -350,6 +352,22 @@ An explicit `annotations(...)` call always wins over hint-derived defaults, on t
 
 > **Deprecated:** `read_only!`/`destructive!`/`idempotent!`/`open_world!`/`closed_world!` (bang methods) still work, as thin aliases over `semantic_hints` — but emit a deprecation warning and will be removed in a future release. Prefer `semantic_hints`/`open_world`/`closed_world` directly, as shown above.
 
+### Title, Icons, and Metadata
+
+`::MCP::Tool` also supports `title`/`icons`/`meta`, alongside `description`/`annotations`. A class subclassing `Axn::MCP::Tool` gets these for free via plain inheritance — declare them in the class body like any other `::MCP::Tool` class method:
+
+```ruby
+class SearchTool < Axn::MCP::Tool
+  description "Search for items"
+  title "Item Search"
+  icons [{ src: "https://example.com/icon.png", mimeType: "image/png" }]
+  meta({ version: "1.0" })
+
+  # ...
+end
+```
+
+`Axn::MCP.wrap` accepts the same three as `title:`/`icons:`/`meta:` kwargs (see [Wrapping a Plain Axn](#wrapping-a-plain-axn-with-axnmcpwrap) below) — a wrapped Axn has no class body of its own to declare them in, so `wrap` is the only way to set them for that path.
 
 ### Factory-Style Definition
 
@@ -395,7 +413,7 @@ GreetPlainlyTool.call(name: "Bob", server_context: { user_id: 42 }) # => MCP::To
 
 If a wrapped Axn needs server-injected data, it must declare the field itself, the same way `Axn::MCP::Tool` does — `expects :server_context, on: :ambient_context, type: Object` (not, say, `expects :user_id, on: :ambient_context` directly) — and read it with the same `server_context&.dig(...)` convention used throughout this README. `Axn::MCP.wrap` doesn't inject anything the wrapped class didn't ask for; it just plumbs the `server_context:` kwarg passed to `.call` into `ambient_context:` before invoking the wrapped Axn.
 
-`wrap` also accepts `name:`, `annotations:`, and `mcp_text_content:` (defaulting to the gem-wide `Axn::MCP.config.mcp_text_content`) — `annotations:`/`mcp_text_content:` mirror `Tool.define`'s own options of the same name, but `name:` is `wrap`-specific: `Tool.define` has no equivalent (it takes no `name:` option; a factory tool's MCP name is derived from the anonymous class as usual).
+`wrap` also accepts `name:`, `title:`, `icons:`, `meta:`, `annotations:`, and `mcp_text_content:` (defaulting to the gem-wide `Axn::MCP.config.mcp_text_content`) — `annotations:`/`mcp_text_content:` mirror `Tool.define`'s own options of the same name, and `title:`/`icons:`/`meta:` mirror `::MCP::Tool`'s own class methods of the same name (see [Title, Icons, and Metadata](#title-icons-and-metadata) above); all are omitted (left at `::MCP::Tool`'s own defaults) unless passed. `name:` is `wrap`-specific: `Tool.define` has no equivalent (it takes no `name:` option; a factory tool's MCP name is derived from the anonymous class as usual).
 
 `name:` defaults to a snake-cased version of the wrapped Axn's own class name (e.g. `GreetPlainly` → `"greet_plainly"`) when omitted — this matters if you register the tool inline (`tools: [Axn::MCP.wrap(GreetPlainly, description: "...")]`) rather than assigning the wrapped class to a constant, since an anonymous Ruby class has no name of its own for `wrap` to fall back on. If the wrapped Axn is *also* anonymous with no derivable name, `wrap` raises `ArgumentError` rather than silently registering an unusable, unnamed tool — pass `name:` explicitly in that case.
 
@@ -425,6 +443,12 @@ Note the safe navigation (`&.dig`): `server_context` may be `nil` if the tool is
 The `server_context` field is excluded from the generated `inputSchema` since it's injected by the MCP server, not provided by the LLM. Under the hood, `Axn::MCP::Tool` declares `expects :server_context, on: :ambient_context, type: Object, optional: true` and routes the value passed to `.call(server_context: ...)` through `axn` core's `ambient_context` mechanism — this is also what keeps it out of `inputSchema` (any `on: :ambient_context` field is excluded automatically, not via a hand-rolled list) and what guarantees an explicit `server_context:` replaces any process-wide ambient context for that call, so server-side state can't leak into an MCP invocation.
 
 `type: Object` (not `Hash`) is deliberate: `server_context`'s actual class depends on how the tool was invoked and which `mcp` gem version is in use. A direct/test-style call (`Tool.call(server_context: {user_id: 1})`) passes whatever raw value you gave it through, which axn's `ambient_context` resolution wraps in an `ActiveSupport::HashWithIndifferentAccess` if it's a plain `Hash` — `#[]`/`#dig`/`is_a?(Hash)` all work regardless of symbol- or string-keyed access; `instance_of?(Hash)`/`#==` against a literal symbol-keyed `Hash` do not. A real `MCP::Server` round-trip (recent `mcp` gem versions) instead passes an `MCP::ServerContext` object, which is not Hash-like at all but transparently delegates arbitrary method calls — including `#dig`/`#[]` — to whatever context object the server was configured with (`MCP::Server.new(server_context: ...)`) via `method_missing`. Reading with `&.dig(...)`/`&.[]` (rather than asserting a specific class) works uniformly across both cases.
+
+#### `MCP::ServerContext`'s richer capabilities
+
+When invoked through a real `MCP::Server`, `server_context` (an `MCP::ServerContext`) offers more than `#dig`/`#[]` — session-scoped operations that talk back to the calling client, e.g. `server_context.report_progress(50, total: 100, message: "Halfway done")` or `server_context.cancelled?` inside a long-running `#call`. These work today with no changes needed on this gem's side — `server_context` is just handed through untouched. They're **not available** on a direct/test-style call, where `server_context` is a plain `Hash`/`nil` with no such methods.
+
+The exact method set is entirely the `mcp` gem's own surface and evolves with it (check `MCP::ServerContext`'s own source for your installed version) — some methods there are themselves marked deprecated by the SDK independent of anything in this gem. Consult it directly rather than treating any list here as authoritative.
 
 ### Dual-Use: MCP Server vs Direct Invocation
 

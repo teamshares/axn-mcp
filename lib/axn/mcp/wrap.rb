@@ -15,13 +15,16 @@ module Axn
       # semantics can call the original wrapped class's own .call! directly (unwrapped).
       VALID_MCP_TEXT_CONTENT = %i[structured message].freeze
 
-      def wrap(axn_class, description:, name: nil, annotations: nil, mcp_text_content: nil)
+      def wrap(axn_class, description:, name: nil, title: nil, icons: nil, meta: nil, annotations: nil, mcp_text_content: nil)
         validate_mcp_text_content!(mcp_text_content)
         resolved_name = resolve_wrap_tool_name(axn_class, name)
 
         Class.new(::MCP::Tool) do
           tool_name(resolved_name)
           description(description)
+          title(title) if title
+          icons(icons) if icons
+          meta(meta) if meta
 
           # axn_class.input_schema/.output_schema are axn core's own public reflection surface
           # (Axn::Core::SchemaReflection) -- wiring to those directly, rather than reaching past

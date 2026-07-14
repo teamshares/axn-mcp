@@ -49,6 +49,28 @@ RSpec.describe "Axn::MCP.wrap" do
     expect(tool.annotations_value.read_only_hint).to be true
   end
 
+  it "sets title/icons/meta from the wrap kwargs, mirroring annotations:" do
+    tool = Axn::MCP.wrap(
+      plain_axn,
+      description: "Greets someone",
+      title: "Greeter",
+      icons: [{ src: "https://example.com/icon.png" }],
+      meta: { version: "1.0" },
+    )
+
+    expect(tool.title).to eq("Greeter")
+    expect(tool.icons).to eq([{ src: "https://example.com/icon.png" }])
+    expect(tool.meta).to eq({ version: "1.0" })
+  end
+
+  it "leaves title/icons/meta unset (matching MCP::Tool's own defaults) when not passed to wrap" do
+    tool = Axn::MCP.wrap(plain_axn, description: "Greets someone")
+
+    expect(tool.title).to be_nil
+    expect(tool.icons).to be_nil
+    expect(tool.meta).to be_nil
+  end
+
   describe "tool naming" do
     it "derives a usable MCP tool name from the wrapped Axn's own class name when name: isn't given" do
       # Simulates the real gap: passing wrap's return value straight into an array/inline usage,
