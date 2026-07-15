@@ -131,5 +131,24 @@ RSpec.describe "Axn::MCP.wrap" do
         Axn::MCP.wrap(plain_axn, description: "Greets someone", mcp_text_content: false)
       end.to raise_error(ArgumentError, "mcp_text_content must be one of :structured, :message; got false")
     end
+
+    it "honors the wrapped Axn's own per-action mcp_text_content override when wrap isn't given an explicit one" do
+      Axn::MCP.config.mcp_text_content = :structured
+      plain_axn.configure(:mcp) { |c| c.mcp_text_content = :message }
+
+      tool = Axn::MCP.wrap(plain_axn, description: "Greets someone")
+      response = tool.call(name: "Alice", server_context: {})
+
+      expect(response.content.first[:text]).to eq("Action completed successfully")
+    end
+
+    it "still lets wrap's own mcp_text_content: kwarg win over the wrapped Axn's per-action override" do
+      plain_axn.configure(:mcp) { |c| c.mcp_text_content = :message }
+
+      tool = Axn::MCP.wrap(plain_axn, description: "Greets someone", mcp_text_content: :structured)
+      response = tool.call(name: "Alice", server_context: {})
+
+      expect(JSON.parse(response.content.first[:text])).to have_key("greeting")
+    end
   end
 end

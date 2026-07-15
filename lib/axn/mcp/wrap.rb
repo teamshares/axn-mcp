@@ -37,11 +37,18 @@ module Axn
           self.annotations(**(annotations || hint_annotations)) if annotations || hint_annotations.any?
 
           define_singleton_method(:call) do |**kwargs|
-            # Resolved fresh on every call (mcp_text_content || Axn::MCP.config...), not captured
-            # once at wrap-time, so this matches Axn::MCP::Tool#call's own mcp_text_content read
-            # guarantee: a gem-wide config change takes effect immediately, even for tools already
-            # wrapped before the change.
-            Axn::MCP::Invocation.perform(axn_class, kwargs, text_content: mcp_text_content || Axn::MCP.config.mcp_text_content)
+            # Resolved fresh on every call, not captured once at wrap-time, so this matches
+            # Axn::MCP::Tool#call's own mcp_text_content read guarantee: a gem-wide config change
+            # takes effect immediately, even for tools already wrapped before the change.
+            #
+            # Reads the wrapped Axn's own per-action override (e.g. `axn_class.configure(:mcp) { |c|
+            # c.mcp_text_content = :message }`) via Axn::MCP.resolve_override_for rather than
+            # axn_class.mcp_text_content -- axn_class is a plain Axn that may never have included
+            # Axn::MCP.overrides, so it may have no such method at all; resolve_override_for reads
+            # the override store directly and falls back to the gem-wide config on its own, with no
+            # dependency on axn_class having that accessor.
+            Axn::MCP::Invocation.perform(axn_class, kwargs,
+                                         text_content: mcp_text_content || Axn::MCP.resolve_override_for(axn_class, :mcp_text_content))
           end
         end
       end

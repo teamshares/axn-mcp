@@ -2,6 +2,14 @@
 
 ## 0.2.0
 
+- Fixed `Axn::MCP.wrap` ignoring a wrapped Axn's own per-action `mcp_text_content` override (set via
+  `MyAxn.configure(:mcp) { |c| c.mcp_text_content = :message }`) when `wrap` itself wasn't given an
+  explicit `mcp_text_content:` kwarg — it fell straight back to the gem-wide config. Now resolves
+  through `Axn::MCP.resolve_override_for(axn_class, :mcp_text_content)`, axn core's shadow-proof
+  override resolver, rather than `axn_class.mcp_text_content` — the wrapped Axn may never have
+  included `Axn::MCP.overrides` at all (it's a plain Axn, not an `Axn::MCP::Tool` subclass), so it
+  may have no such accessor to call. Precedence is now: `wrap`'s own `mcp_text_content:` kwarg, then
+  the wrapped Axn's per-action override, then the gem-wide config.
 - `Axn::MCP.wrap` accepts `title:`/`icons:`/`meta:` kwargs, mirroring `::MCP::Tool`'s own class
   methods of the same name — a wrapped Axn has no class body of its own in which to declare them.
   A class subclassing `Axn::MCP::Tool` already had these for free via plain inheritance (no
