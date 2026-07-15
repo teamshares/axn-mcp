@@ -377,6 +377,18 @@ RSpec.describe Axn::MCP::Tool do
       expect(schema.to_h[:required]).not_to include("age")
     end
 
+    it "reflects a conditionally required field as an allOf clause, not an unconditional required entry" do
+      tool = Class.new(described_class) do
+        expects :use_token, type: :boolean, optional: true
+        expects :token, type: String, if: :use_token
+      end
+
+      schema = tool.input_schema.to_h
+      expect(Array(schema[:required])).not_to include("token")
+      expect(schema[:allOf]).to be_present
+      expect(schema[:allOf].first[:then][:required]).to eq(["token"])
+    end
+
     it "allows manual override" do
       tool = Class.new(described_class) do
         input_schema({ properties: { custom: { type: "string" } } })

@@ -2,6 +2,18 @@
 
 ## 0.2.0
 
+- Fixed `Axn::MCP::Tool#input_schema` reflecting a conditionally required field (e.g. `expects
+  :token, if: :use_token`) as unconditionally required instead of an `allOf` conditional clause.
+  Requires axn's new `klass:` param on `Axn::Reflection::Schema.build_input`, added alongside axn's
+  own conditional-validation feature (`if:`/`unless:` on `expects`/`exposes`, axn PRO-2881) — without
+  it, `build_input` can't prove the gate references a framework-generated reader and falls back to
+  the static-maximal-safe default
+  (unconditionally required). `MCP::Server`'s own pre-flight `missing_required_arguments?` check
+  would otherwise wrongly reject a call omitting the gated field even when Axn itself would accept
+  it. `Axn::MCP.wrap` was never affected — it delegates to the wrapped Axn's own public
+  `input_schema` method, which already passed `klass: self` internally; only `Axn::MCP::Tool`'s own
+  hand-rolled getter (which calls the lower-level builder directly, for its schema-caching/override
+  behavior) needed the fix.
 - Fixed `Axn::MCP.wrap` ignoring a wrapped Axn's own per-action `mcp_text_content` override (set via
   `MyAxn.configure(:mcp) { |c| c.mcp_text_content = :message }`) when `wrap` itself wasn't given an
   explicit `mcp_text_content:` kwarg — it fell straight back to the gem-wide config. Now resolves
@@ -118,11 +130,12 @@
   (also renamed upstream, to `mcp_text_content_override`), so that rename needs no local change.
 - Requires an `axn` version that ships `Axn::Core::SchemaReflection`, `Axn::Core::SemanticHints`,
   `Axn::Core::AmbientContext`, `Axn::Core::MethodShadowing`, `Axn::FieldDeclarations`,
-  `Axn::ExtensionConfig#register_semantic_hint`, `Axn::Reflection::{Schema,Values}`, and
-  `Axn::Configurable`'s namespaced `config_namespace` plus the `resolved_<name>`
-  removal/`raw_<name>` rename (axn PRO-2842 / PRO-2875 / PRO-2878 / PRO-2880 / PRO-2888). As of
-  this writing, axn has no tagged release with these primitives yet; this gem's Gemfile currently
-  tracks `axn` git `main` (`github: "teamshares/axn", branch: "main"`) pending an axn release.
+  `Axn::ExtensionConfig#register_semantic_hint`, `Axn::Reflection::{Schema,Values}`,
+  `Axn::Configurable`'s namespaced `config_namespace`, the `resolved_<name>` removal/`raw_<name>`
+  rename, and `Axn::Reflection::Schema.build_input`'s `klass:` param (axn PRO-2842 / PRO-2875 /
+  PRO-2878 / PRO-2880 / PRO-2888 / PRO-2881). As of this writing, axn has no tagged release with
+  these primitives yet; this gem's Gemfile currently tracks `axn` git `main`
+  (`github: "teamshares/axn", branch: "main"`) pending an axn release.
 
 ## 0.1.1
 

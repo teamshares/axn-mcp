@@ -52,8 +52,16 @@ module Axn
             # server_context is declared `on: :ambient_context` (see above), so axn core's own
             # Axn::Reflection::Schema.build_input already excludes it (and any other ambient
             # subfield) from internal_field_configs/properties -- no hand-rolled exclusion list needed.
+            #
+            # klass: self (+ the cached resolved: artifact) matches axn core's own public
+            # Axn::Core::SchemaReflection::InputSchemaMethod#input_schema call exactly -- without
+            # klass:, a conditionally required field (`expects :token, if: :use_token`) can't be
+            # proven to gate on a framework-generated reader, so build_input falls back to listing it
+            # in the unconditional root `required` instead of an `allOf` conditional clause, which
+            # MCP::Server's own pre-flight `missing_required_arguments?` check would then wrongly
+            # reject even when Axn itself would accept the omission.
             @input_schema_value = ::MCP::Tool::InputSchema.new(
-              Axn::Reflection::Schema.build_input(internal_field_configs, subfield_configs),
+              Axn::Reflection::Schema.build_input(internal_field_configs, subfield_configs, resolved: _resolved_subfields, klass: self),
             )
           end
         end
