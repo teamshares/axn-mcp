@@ -13,11 +13,22 @@
 - Documented in the README's intro that this gem is scoped to MCP Tools only — Resources, Resource
   Templates, and Prompts are `MCP::Server` concepts this gem doesn't adapt an Axn into — per
   PRO-2879 item 3.
-- Documented that schema reflection is best-effort and deliberately biased stricter-than-runtime
-  (a client following the schema never triggers a failed call, but the schema may occasionally be
-  more restrictive than what the tool would actually accept) — per axn PRO-2842 review feedback.
-  `Axn::MCP.wrap` now wires directly to the wrapped Axn's own public `input_schema`/`output_schema`
-  reflection methods rather than reaching past them for the lower-level schema builder.
+- Documented that schema reflection is best-effort and deliberately biased stricter-than-runtime (a
+  client following the schema won't be rejected by schema validation, but the schema may
+  occasionally be more restrictive than what the tool would actually accept) — per axn PRO-2842
+  review feedback. `Axn::MCP.wrap` now wires directly to the wrapped Axn's own public
+  `input_schema`/`output_schema` reflection methods rather than reaching past them for the
+  lower-level schema builder.
+- Softened the README's schema-reflection claim from "will never trigger a failed call" to name its
+  one documented exception: a field with an invalid default (e.g. `default: 123` on a `String`
+  field) reflects as optional (a default is present) without axn validating the default itself, so
+  omitting the field applies the bad default and fails at runtime despite the schema saying it's
+  fine to omit. This is the one spot where the input schema is *looser* than runtime, not stricter —
+  deliberately left open rather than closed with declaration-time default-validation, since that
+  would only catch literal defaults, not custom validators/callable defaults/model lookups. Matters
+  here because `MCP::Server` pre-flight-validates arguments against `inputSchema`
+  (`validate_tool_call_arguments`, on by default), so a schema-valid call can still fail at runtime
+  in this narrow case. Tracked as a known gap, not a bug — PRO-2879 item 4.
 - Adopted `axn` core's JSON Schema reflection (`Axn::Reflection::Schema`) and exposed-value
   serialization (`Axn::Reflection::Values`), added in axn PRO-2842. `Axn::MCP::SchemaBuilder` and
   the old `Axn::MCP::Serializer.serialize_exposed`/`.serialize_value` methods are removed — schema

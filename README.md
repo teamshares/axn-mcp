@@ -50,12 +50,22 @@ gem no longer carries its own schema-building or serialization logic.
 *statically* from your `expects`/`exposes` declarations — reflection is side-effect-free and never
 runs your validators. Where a value's wire form isn't *provable* from the declared type, the schema
 reflects the conservative answer (untyped, required, or non-null) rather than guess. The net
-contract: **a client that follows the schema will never trigger a failed call; the schema may
-occasionally be more restrictive than what the tool would actually accept at runtime.** Concretely,
-you may see: `type` omitted entirely (an untyped `{}`) when the wire form isn't knowable (e.g. a
-`Numeric`/`Complex` field, or a reader-only/custom-serialized object); `not: { type: "null" }` on a
-required `model:`-generated `_id` (a primary key has no fixed JSON type); `enum: [true]`/`[false]`
-for a `TrueClass`/`FalseClass` field; and `anyOf` for union types.
+contract: **a client that follows the schema will not be rejected by schema validation; the schema
+may occasionally be more restrictive than what the tool would actually accept at runtime.**
+Concretely, you may see: `type` omitted entirely (an untyped `{}`) when the wire form isn't knowable
+(e.g. a `Numeric`/`Complex` field, or a reader-only/custom-serialized object); `not: { type: "null"
+}` on a required `model:`-generated `_id` (a primary key has no fixed JSON type); `enum:
+[true]`/`[false]` for a `TrueClass`/`FalseClass` field; and `anyOf` for union types.
+
+This isn't an absolute "schema-valid implies success" guarantee, though: a schema-following call can
+still fail axn's own runtime validation in the narrow case where a field's contract is
+self-contradictory — e.g. `expects :name, type: String, default: 123` reflects `name` as *optional*
+(a default is present), but omitting it applies the invalid default and then fails runtime
+validation. Reflection derives requiredness from the declared *signals* (a present default,
+`optional:`/`allow_nil:`/`allow_blank:`) without evaluating whether the default itself is valid —
+catching that would only cover literal defaults, not custom validators, callable defaults, or model
+lookups, so the caveat exists either way. This is the one documented spot where the input schema is
+*looser* than runtime rather than stricter (tracked as a known gap, not a bug — see PRO-2879).
 
 ## Usage
 
