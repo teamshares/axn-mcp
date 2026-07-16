@@ -618,3 +618,43 @@ Bug reports and pull requests are welcome on GitHub at [https://github.com/teams
 ## Acknowledgments
 
 This gem wraps the excellent [MCP Ruby SDK](https://github.com/modelcontextprotocol/ruby-sdk) from the Model Context Protocol team.
+
+<!-- TEMPORARY: transitional upgrade guide — remove this section at 1.0 (tracked in DEPRECATIONS.md). -->
+## Upgrading from 0.1.x
+
+`0.2.0` re-architects the gem around author-once (a plain Axn exposed via `Axn::MCP.wrap` / `Axn::MCP.tools`) and retires the `Axn::MCP::Tool` subclass base. The migration is mechanical — mostly one-liners:
+
+| 0.1.x | 0.2.0 |
+| --- | --- |
+| `class T < Axn::MCP::Tool` … `end` | a plain Axn (`class T; include Axn; … end`), then `Axn::MCP.wrap(T)` |
+| `Axn::MCP::Tool.define(description:, expects:, exposes:, …) { … }` | `Axn::MCP.wrap(Axn::Factory.build(expects:, exposes:) { … }, name: "…", description: "…")` |
+| `mcp_text_content :message` / `Axn::MCP.config.mcp_text_content` | `present_as` (same `:structured`/`:message` values) — on `configure(:mcp)`, `Axn::MCP.config`, or `wrap(present_as:)` |
+| `Axn::MCP.config.error_headline = "…"` | declare a per-tool base `error "…"` on the Axn (MCP errors now surface `result.error`) |
+| `read_only!` / `destructive!` / `idempotent!` / `open_world` / `closed_world` | `semantic_hints :read_only, :open_world, …` on the plain Axn |
+| a hand-maintained `tools: [T1, T2, …]` array | `tool :mcp` on each Axn + `MCP::Server.new(tools: Axn::MCP.tools)` |
+
+The most common case, before and after:
+
+```ruby
+# 0.1.x
+class GreetUser < Axn::MCP::Tool
+  description "Greet a user"
+  expects :name, type: String
+  exposes :greeting, type: String
+  def call = expose(greeting: "Hello, #{name}!")
+end
+# registered as: tools: [GreetUser]
+
+# 0.2.0
+class GreetUser
+  include Axn
+  tool :mcp                       # opt into Axn::MCP.tools discovery
+  description "Greet a user"
+  expects :name, type: String
+  exposes :greeting, type: String
+  def call = expose(greeting: "Hello, #{name}!")
+end
+# registered as: tools: Axn::MCP.tools   # or explicitly: [Axn::MCP.wrap(GreetUser)]
+```
+
+The retired `Axn::MCP::Tool` / `.define` and the renamed `wrap(mcp_text_content:)` kwarg **raise** with migration messages rather than failing silently, so anything you miss surfaces loudly. See [`DEPRECATIONS.md`](DEPRECATIONS.md) for what's slated for removal at 1.0.
