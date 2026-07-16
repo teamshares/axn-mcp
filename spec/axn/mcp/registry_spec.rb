@@ -38,6 +38,38 @@ RSpec.describe "Axn::MCP tool-adapter registration" do
       expect(listed.description).to eq("Listed tool") # zero-arg: description derived from the Axn
     end
 
+    it "returns tools deterministically ordered by tool_name (via core's tools_for sort)" do
+      # Registered out of alphabetical order; core's tools_for sorts by tool_name, so Axn::MCP.tools
+      # is stable regardless of load/registration order (a property both adapter gems inherit).
+      stub_const("ZzzOrderingTool", Class.new do
+        include Axn
+
+        tool(:mcp)
+        exposes(:x, type: String)
+        def call = expose(x: "y")
+      end)
+
+      stub_const("AaaOrderingTool", Class.new do
+        include Axn
+
+        tool(:mcp)
+        exposes(:x, type: String)
+        def call = expose(x: "y")
+      end)
+
+      stub_const("MmmOrderingTool", Class.new do
+        include Axn
+
+        tool(:mcp)
+        exposes(:x, type: String)
+        def call = expose(x: "y")
+      end)
+
+      mine = Axn::MCP.tools.map(&:name_value).select { |n| n.end_with?("_ordering_tool") }
+
+      expect(mine).to eq(%w[aaa_ordering_tool mmm_ordering_tool zzz_ordering_tool])
+    end
+
     it "honors a per-class configure(:mcp) override at wrap time" do
       stub_const("ConfiguredToolsTool", Class.new do
         include Axn
