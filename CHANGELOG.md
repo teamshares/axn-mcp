@@ -2,6 +2,13 @@
 
 ## 0.2.0
 
+- **Renamed the render toggle `mcp_text_content` → `present_as`** (PRO-2923) — the setting picking
+  whether a tool's text output is the structured `exposes` (`:structured`) or the Axn's message
+  (`:message`). Drops the redundant `mcp_` prefix inside the `:mcp` config namespace and unifies the
+  name with `axn-ruby_llm`'s `present_as`. Applies to the gem-wide `Axn::MCP.config.present_as`, the
+  per-class `configure(:mcp) { |c| c.present_as = ... }`, and the `Axn::MCP.wrap(present_as:)` kwarg.
+  The `wrap` kwarg keeps `mcp_text_content:` as a raising alias with a migration message (removed at
+  1.0, see `DEPRECATIONS.md`); the config-setting rename is a hard rename (nothing released).
 - **Retired the `Axn::MCP::Tool` subclass base** (PRO-2923) in favor of the author-once model:
   write a plain Axn and expose it with `Axn::MCP.wrap` (one) or `Axn::MCP.tools` (all registered
   `:mcp` tools). The base's dual-mode `.call` (returning `Axn::Result` *or* `MCP::Tool::Response`

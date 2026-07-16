@@ -191,41 +191,47 @@ RSpec.describe "Axn::MCP.wrap" do
     end
   end
 
-  describe "mcp_text_content resolution" do
+  describe "present_as resolution" do
     around do |example|
-      original = Axn::MCP.config.mcp_text_content
+      original = Axn::MCP.config.present_as
       example.run
     ensure
-      Axn::MCP.config.mcp_text_content = original
+      Axn::MCP.config.present_as = original
     end
 
     it "re-reads the gem-wide config fresh on every call, not just once at wrap-time" do
-      Axn::MCP.config.mcp_text_content = :structured
+      Axn::MCP.config.present_as = :structured
       tool = Axn::MCP.wrap(plain_axn, description: "Greets someone")
 
       structured_response = tool.call(name: "Alice", server_context: {})
       expect(JSON.parse(structured_response.content.first[:text])).to have_key("greeting")
 
-      Axn::MCP.config.mcp_text_content = :message
+      Axn::MCP.config.present_as = :message
       message_response = tool.call(name: "Alice", server_context: {})
       expect(message_response.content.first[:text]).to eq("Action completed successfully")
     end
 
-    it "raises ArgumentError for an invalid mcp_text_content value, matching Axn::MCP.config's own validation" do
+    it "raises ArgumentError for an invalid present_as value, matching Axn::MCP.config's own validation" do
       expect do
-        Axn::MCP.wrap(plain_axn, description: "Greets someone", mcp_text_content: :mesage)
-      end.to raise_error(ArgumentError, "mcp_text_content must be one of :structured, :message; got :mesage")
+        Axn::MCP.wrap(plain_axn, description: "Greets someone", present_as: :mesage)
+      end.to raise_error(ArgumentError, "present_as must be one of :structured, :message; got :mesage")
     end
 
-    it "raises ArgumentError for mcp_text_content: false rather than silently falling back to the default" do
+    it "raises ArgumentError for present_as: false rather than silently falling back to the default" do
       expect do
-        Axn::MCP.wrap(plain_axn, description: "Greets someone", mcp_text_content: false)
-      end.to raise_error(ArgumentError, "mcp_text_content must be one of :structured, :message; got false")
+        Axn::MCP.wrap(plain_axn, description: "Greets someone", present_as: false)
+      end.to raise_error(ArgumentError, "present_as must be one of :structured, :message; got false")
     end
 
-    it "honors the wrapped Axn's own per-action mcp_text_content override when wrap isn't given an explicit one" do
-      Axn::MCP.config.mcp_text_content = :structured
-      plain_axn.configure(:mcp) { |c| c.mcp_text_content = :message }
+    it "raises a pointed migration error for the retired `mcp_text_content:` kwarg (renamed to present_as:)" do
+      expect do
+        Axn::MCP.wrap(plain_axn, description: "Greets someone", mcp_text_content: :message)
+      end.to raise_error(ArgumentError, /`mcp_text_content:` was renamed to `present_as:`.*Replace `mcp_text_content: :message` with `present_as: :message`/m)
+    end
+
+    it "honors the wrapped Axn's own per-action present_as override when wrap isn't given an explicit one" do
+      Axn::MCP.config.present_as = :structured
+      plain_axn.configure(:mcp) { |c| c.present_as = :message }
 
       tool = Axn::MCP.wrap(plain_axn, description: "Greets someone")
       response = tool.call(name: "Alice", server_context: {})
@@ -233,10 +239,10 @@ RSpec.describe "Axn::MCP.wrap" do
       expect(response.content.first[:text]).to eq("Action completed successfully")
     end
 
-    it "still lets wrap's own mcp_text_content: kwarg win over the wrapped Axn's per-action override" do
-      plain_axn.configure(:mcp) { |c| c.mcp_text_content = :message }
+    it "still lets wrap's own present_as: kwarg win over the wrapped Axn's per-action override" do
+      plain_axn.configure(:mcp) { |c| c.present_as = :message }
 
-      tool = Axn::MCP.wrap(plain_axn, description: "Greets someone", mcp_text_content: :structured)
+      tool = Axn::MCP.wrap(plain_axn, description: "Greets someone", present_as: :structured)
       response = tool.call(name: "Alice", server_context: {})
 
       expect(JSON.parse(response.content.first[:text])).to have_key("greeting")

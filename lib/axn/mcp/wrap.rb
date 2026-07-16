@@ -15,7 +15,12 @@ module Axn
       # returns MCP::Tool::Response (never a raw Axn::Result), and it deliberately has no .call! --
       # MCP::Server itself only ever calls .call, and a consumer wanting real bang/raise-on-failure
       # semantics can call the original wrapped class's own .call! directly (unwrapped).
-      VALID_MCP_TEXT_CONTENT = %i[structured message].freeze
+      VALID_PRESENT_AS = %i[structured message].freeze
+
+      # Sentinel for the retired `mcp_text_content:` kwarg (renamed to `present_as:`, PRO-2923), so a
+      # caller still passing it gets a pointed migration error instead of silently having it ignored.
+      RENAMED_MCP_TEXT_CONTENT = Object.new.freeze
+      private_constant :RENAMED_MCP_TEXT_CONTENT
 
       # The gem-level convenience for building a ready-to-register MCP tool list (PRO-2923),
       # symmetric with `Axn::RubyLLM.tools`: enumerate every Axn that belongs to the :mcp adapter
@@ -27,8 +32,10 @@ module Axn
         Axn.tools_for(:mcp).map { |axn_class| wrap(axn_class) }
       end
 
-      def wrap(axn_class, description: nil, name: nil, title: nil, icons: nil, meta: nil, annotations: nil, mcp_text_content: nil)
-        validate_mcp_text_content!(mcp_text_content)
+      def wrap(axn_class, description: nil, name: nil, title: nil, icons: nil, meta: nil, annotations: nil,
+               present_as: nil, mcp_text_content: RENAMED_MCP_TEXT_CONTENT)
+        reject_renamed_mcp_text_content!(mcp_text_content)
+        validate_present_as!(present_as)
         resolved_name = resolve_wrap_tool_name(axn_class, name)
         resolved_description = description || axn_class.description
 
@@ -50,34 +57,43 @@ module Axn
           self.annotations(**(annotations || hint_annotations)) if annotations || hint_annotations.any?
 
           define_singleton_method(:call) do |**kwargs|
-            # Resolved fresh on every call, not captured once at wrap-time, so this matches
-            # Axn::MCP::Tool#call's own mcp_text_content read guarantee: a gem-wide config change
-            # takes effect immediately, even for tools already wrapped before the change.
+            # Resolved fresh on every call, not captured once at wrap-time, so a gem-wide config
+            # change takes effect immediately, even for tools already wrapped before the change.
             #
             # Reads the wrapped Axn's own per-action override (e.g. `axn_class.configure(:mcp) { |c|
-            # c.mcp_text_content = :message }`) via Axn::MCP.resolve_override_for rather than
-            # axn_class.mcp_text_content -- axn_class is a plain Axn that may never have included
+            # c.present_as = :message }`) via Axn::MCP.resolve_override_for rather than
+            # axn_class.present_as -- axn_class is a plain Axn that may never have included
             # Axn::MCP.overrides, so it may have no such method at all; resolve_override_for reads
             # the override store directly and falls back to the gem-wide config on its own, with no
             # dependency on axn_class having that accessor.
             Axn::MCP::Invocation.perform(axn_class, kwargs,
-                                         text_content: mcp_text_content || Axn::MCP.resolve_override_for(axn_class, :mcp_text_content))
+                                         text_content: present_as || Axn::MCP.resolve_override_for(axn_class, :present_as))
           end
         end
       end
 
       private
 
-      # Fail fast on any explicitly-provided invalid value (a typo like :mesage, or `false`)
-      # rather than silently falling through to :structured -- matches the validation
-      # Axn::MCP.config.mcp_text_content=/Tool's mcp_text_content(...) setting already enforce
-      # (same error message shape). `nil` alone means "not provided" (use the gem-wide default
-      # at call time) -- checked via `nil?`, not truthiness, so `mcp_text_content: false` can't
-      # skip this guard the way a truthy-only check would.
-      def validate_mcp_text_content!(mcp_text_content)
-        return if mcp_text_content.nil? || VALID_MCP_TEXT_CONTENT.include?(mcp_text_content)
+      # `mcp_text_content:` was renamed to `present_as:` (PRO-2923). It's kept as a raising alias --
+      # rather than silently dropped -- so a caller still passing it gets a pointed migration error.
+      # Detected via a sentinel (not `nil?`), so an explicit `mcp_text_content: nil` is still caught.
+      def reject_renamed_mcp_text_content!(value)
+        return if value.equal?(RENAMED_MCP_TEXT_CONTENT)
 
-        raise ArgumentError, "mcp_text_content must be one of #{VALID_MCP_TEXT_CONTENT.map(&:inspect).join(", ")}; got #{mcp_text_content.inspect}"
+        raise ArgumentError,
+              "Axn::MCP.wrap's `mcp_text_content:` was renamed to `present_as:` (PRO-2923). " \
+              "Replace `mcp_text_content: #{value.inspect}` with `present_as: #{value.inspect}`."
+      end
+
+      # Fail fast on any explicitly-provided invalid value (a typo like :mesage, or `false`)
+      # rather than silently falling through to :structured -- matches the validation the
+      # `present_as` setting already enforces. `nil` alone means "not provided" (use the resolved
+      # per-class/gem-wide value at call time) -- checked via `nil?`, not truthiness, so
+      # `present_as: false` can't skip this guard the way a truthy-only check would.
+      def validate_present_as!(present_as)
+        return if present_as.nil? || VALID_PRESENT_AS.include?(present_as)
+
+        raise ArgumentError, "present_as must be one of #{VALID_PRESENT_AS.map(&:inspect).join(", ")}; got #{present_as.inspect}"
       end
 
       # Resolve the provider-facing tool name. An explicit `name:` kwarg (most local to the call

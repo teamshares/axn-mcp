@@ -78,7 +78,7 @@ RSpec.describe "Axn::MCP tool-adapter registration" do
         description "Configured tool"
         exposes :greeting, type: String
         def call = expose(greeting: "hi")
-        configure(:mcp) { |c| c.mcp_text_content = :message }
+        configure(:mcp) { |c| c.present_as = :message }
       end)
 
       listed = Axn::MCP.tools.find { |t| t.name_value == "configured_tools_tool" }

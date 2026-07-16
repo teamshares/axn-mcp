@@ -88,7 +88,7 @@ in, all producing the same kind of `::MCP::Tool` subclass.
 GreetUserTool = Axn::MCP.wrap(GreetUser)
 ```
 
-`wrap(axn_class, description: nil, name: nil, title: nil, icons: nil, meta: nil, annotations: nil, mcp_text_content: nil)`:
+`wrap(axn_class, description: nil, name: nil, title: nil, icons: nil, meta: nil, annotations: nil, present_as: nil)`:
 
 - **`description:`** defaults to the Axn's own `.description`. Pass it to override.
 - **`name:`** defaults to `axn_class.tool_name` — axn core's canonical, provider-safe name, which
@@ -97,7 +97,7 @@ GreetUserTool = Axn::MCP.wrap(GreetUser)
   tool inline (`tools: [Axn::MCP.wrap(GreetUser)]`) rather than assigning it to a constant. If the
   wrapped Axn is *truly* anonymous (no class name, no `axn_name`), `wrap` raises `ArgumentError`
   rather than ship an unusable, unnamed tool — pass `name:` in that case.
-- **`annotations:`** / **`mcp_text_content:`** / **`title:`** / **`icons:`** / **`meta:`** — all
+- **`annotations:`** / **`present_as:`** / **`title:`** / **`icons:`** / **`meta:`** — all
   optional; see the sections below. Omitted values fall through to the Axn's own declarations
   (`semantic_hints`, `configure(:mcp)`) or `::MCP::Tool`'s defaults.
 
@@ -158,7 +158,7 @@ SearchTool = Axn::MCP.wrap(
 ```
 
 `Axn::Factory.build` carries the action's behavior (`expects`/`exposes`/`success`/`error`/hooks/…);
-the MCP-facing bits (`name:`/`description:`/`annotations:`/`mcp_text_content:`) go to `wrap`. For a
+the MCP-facing bits (`name:`/`description:`/`annotations:`/`present_as:`) go to `wrap`. For a
 multi-adapter one-off, build the Axn once and hand it to each adapter's `wrap`.
 
 ### Mixing with native `::MCP::Tool` tools
@@ -534,17 +534,17 @@ Unhandled exceptions are also caught automatically. When an exception occurs:
 
 ## Success response text: config and per-tool
 
-By default, successful responses contain a text block with the JSON-serialized `structured_content` (a SHOULD per [MCP spec](https://modelcontextprotocol.io/specification/draft/server/tools#structured-content)). To use the Axn success message instead, set **gem-wide config** once (`Axn::MCP.config.mcp_text_content = :message`), override **per tool** via `configure(:mcp)`, or pass it to `wrap`. Valid values are `:structured` (default) and `:message`. Precedence (most local wins): `wrap`'s `mcp_text_content:` kwarg → the Axn's own `configure(:mcp)` override → the gem-wide config.
+By default, successful responses contain a text block with the JSON-serialized `structured_content` (a SHOULD per [MCP spec](https://modelcontextprotocol.io/specification/draft/server/tools#structured-content)). To use the Axn success message instead, set **gem-wide config** once (`Axn::MCP.config.present_as = :message`), override **per tool** via `configure(:mcp)`, or pass it to `wrap`. Valid values are `:structured` (default) and `:message`. Precedence (most local wins): `wrap`'s `present_as:` kwarg → the Axn's own `configure(:mcp)` override → the gem-wide config.
 
 ```ruby
 # per-tool, on the Axn:
 class MyAction
   include Axn
-  configure(:mcp) { |c| c.mcp_text_content = :message }
+  configure(:mcp) { |c| c.present_as = :message }
 end
 
 # or at wrap time:
-Axn::MCP.wrap(MyAction, mcp_text_content: :message)
+Axn::MCP.wrap(MyAction, present_as: :message)
 ```
 
 `configure(:mcp)` uses axn core's namespaced config DSL. The same base Axn can be composed with another adapter (e.g. an `axn-ruby_llm` gem) via its own `config_namespace` — each adapter's settings live in their own namespace, so `configure(:mcp)` and `configure(:other_adapter)` on the same class never collide.

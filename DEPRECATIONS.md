@@ -56,7 +56,25 @@ Axn::MCP.wrap(
 )
 ```
 
+### `Axn::MCP.wrap(mcp_text_content:)` kwarg — PRO-2923
+
+Renamed to `present_as:` (unifying the "structured data vs. the Axn message" render toggle with
+`axn-ruby_llm`'s `present_as`, and dropping the redundant `mcp_` prefix that doubled up inside the
+`:mcp` config namespace). The old kwarg is kept as a **raising alias**: passing `mcp_text_content:`
+raises `ArgumentError` pointing at `present_as:`.
+
+**Delete at 1.0:** remove the `mcp_text_content:` parameter and `reject_renamed_mcp_text_content!`
+from `Axn::MCP.wrap` (`lib/axn/mcp/wrap.rb`).
+
 ## Removed (no stub)
+
+- **`present_as` config setting was `mcp_text_content`** (PRO-2923) — the gem-wide
+  `Axn::MCP.config.present_as` and the per-class `configure(:mcp) { |c| c.present_as = ... }`
+  setting were renamed from `mcp_text_content`. Nothing is released, so this is a hard rename: the
+  old `config.mcp_text_content` raises `NoMethodError` and `configure(:mcp) { |c| c.mcp_text_content
+  = ... }` raises `ArgumentError` (unknown setting) — both surfaced by axn core's config DSL, so
+  they aren't given a pointed migration message the way the `wrap` kwarg is. Use `present_as`
+  (`:structured` / `:message`).
 
 - **`Axn::MCP.config.error_headline`** (PRO-2923) — the gem no longer imposes a `"Tool call
   failed"` headline on failures. MCP error responses now carry the Axn's own `result.error`.

@@ -285,14 +285,14 @@ RSpec.describe "MCP Server Integration", type: :integration do
     end
   end
 
-  describe "mcp_text_content config and per-tool" do
+  describe "present_as config and per-tool" do
     context "central config sets default to :message" do
       around do |example|
-        original = Axn::MCP.config.mcp_text_content
-        Axn::MCP.config.mcp_text_content = :message
+        original = Axn::MCP.config.present_as
+        Axn::MCP.config.present_as = :message
         example.run
       ensure
-        Axn::MCP.config.mcp_text_content = original
+        Axn::MCP.config.present_as = original
       end
 
       let(:structured_axn) do
@@ -327,11 +327,11 @@ RSpec.describe "MCP Server Integration", type: :integration do
 
     context "per-tool overrides config" do
       around do |example|
-        original = Axn::MCP.config.mcp_text_content
-        Axn::MCP.config.mcp_text_content = :message
+        original = Axn::MCP.config.present_as
+        Axn::MCP.config.present_as = :message
         example.run
       ensure
-        Axn::MCP.config.mcp_text_content = original
+        Axn::MCP.config.present_as = original
       end
 
       let(:override_axn) do
@@ -352,9 +352,9 @@ RSpec.describe "MCP Server Integration", type: :integration do
         end
       end
 
-      # wrap's own mcp_text_content: kwarg is the most-local per-tool override and wins over the
+      # wrap's own present_as: kwarg is the most-local per-tool override and wins over the
       # gem-wide config default of :message.
-      let(:tools) { [Axn::MCP.wrap(override_axn, mcp_text_content: :structured)] }
+      let(:tools) { [Axn::MCP.wrap(override_axn, present_as: :structured)] }
 
       it "per-tool :structured wins over config :message" do
         request = json_rpc_request("tools/call", { name: "override_tool", arguments: {} })
@@ -401,7 +401,7 @@ RSpec.describe "MCP Server Integration", type: :integration do
       expect(call_response[:result][:structuredContent]).to eq({ count: 5 })
     end
 
-    it "honors mcp_text_content passed to wrap" do
+    it "honors present_as passed to wrap" do
       message_axn = Axn::Factory.build(
         exposes: { value: { type: Integer } },
         success: "Returned message",
@@ -412,7 +412,7 @@ RSpec.describe "MCP Server Integration", type: :integration do
         message_axn,
         name: "message_returner",
         description: "Returns message",
-        mcp_text_content: :message,
+        present_as: :message,
       )
 
       response = message_tool.call(value: 10, server_context: {})
