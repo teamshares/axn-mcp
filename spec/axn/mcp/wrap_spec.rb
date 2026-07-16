@@ -134,6 +134,24 @@ RSpec.describe "Axn::MCP.wrap" do
       expect(tool.name_value).to eq("concise")
     end
 
+    it "uses axn core's tool_name verbatim, so the same class yields the same name across adapter gems" do
+      # Cross-gem parity guardrail (mirror of the same assertion in axn-ruby_llm, PRO-2924): both
+      # Axn::MCP.wrap and Axn::RubyLLM.wrap derive the tool name from core's `tool_name`, so wrapping
+      # the SAME Axn on either surface produces identical names. Pinning `== axn_class.tool_name` here
+      # is the axn-mcp half of that contract.
+      named = Class.new do
+        include Axn
+
+        def self.name = "SomeVerboseClassName"
+        tool name: "concise"
+        exposes :x, type: String
+        def call = expose(x: "y")
+      end
+
+      expect(Axn::MCP.wrap(named, description: "d").name_value).to eq(named.tool_name)
+      expect(Axn::MCP.wrap(plain_axn, description: "d").name_value).to eq(plain_axn.tool_name)
+    end
+
     it "raises when neither name: nor a derivable axn_class.name is available" do
       truly_anonymous = Class.new do
         include Axn
