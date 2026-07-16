@@ -146,20 +146,21 @@ There's no `Axn::MCP.define`; the inline primitive lives in axn core. For a thro
 plain Axn with `Axn::Factory.build` (block-as-`#call`, no class needed) and wrap it:
 
 ```ruby
-SearchTool = Axn::MCP.wrap(
-  Axn::Factory.build(
-    expects: { query: { type: String, description: "Search query" } },
-    exposes: { results: { type: Array } },
-  ) { expose results: Item.search(query) },
-  name: "search",
-  description: "Search for items",
-  annotations: { read_only_hint: true },
-)
+# The block is the Axn's #call body — pass it to Axn::Factory.build.
+search = Axn::Factory.build(
+  expects: { query: { type: String, description: "Search query" } },
+  exposes: { results: { type: Array } },
+) do
+  expose results: Item.search(query)
+end
+
+SearchTool = Axn::MCP.wrap(search, name: "search", description: "Search for items", annotations: { read_only_hint: true })
 ```
 
-`Axn::Factory.build` carries the action's behavior (`expects`/`exposes`/`success`/`error`/hooks/…);
-the MCP-facing bits (`name:`/`description:`/`annotations:`/`present_as:`) go to `wrap`. For a
-multi-adapter one-off, build the Axn once and hand it to each adapter's `wrap`.
+`Axn::Factory.build` carries the action's behavior — the `#call` block plus
+`expects`/`exposes`/`success`/`error`/hooks/… — while the MCP-facing bits
+(`name:`/`description:`/`annotations:`/`present_as:`) go to `wrap`. For a multi-adapter one-off,
+build the Axn once and hand it to each adapter's `wrap`.
 
 ### Mixing with native `::MCP::Tool` tools
 
