@@ -75,7 +75,7 @@ validation. Reflection derives requiredness from the declared *signals* (a prese
 `optional:`/`allow_nil:`/`allow_blank:`) without evaluating whether the default itself is valid —
 catching that would only cover literal defaults, not custom validators, callable defaults, or model
 lookups, so the caveat exists either way. This is the one documented spot where the input schema is
-*looser* than runtime rather than stricter (tracked as a known gap, not a bug — see PRO-2879).
+*looser* than runtime rather than stricter (a known, deliberate gap, not a bug).
 
 ## Exposing tools
 

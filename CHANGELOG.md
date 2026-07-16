@@ -74,7 +74,7 @@ reflection rather than gem code.
   `closed_world!`) and the `open_world` / `closed_world` class helpers — declare `semantic_hints` on
   the plain Axn instead.
 - **`resolved_mcp_text_content`** — read `SomeTool.present_as` (axn core also dropped the
-  `resolved_<name>` reader form in PRO-2888).
+  `resolved_<name>` reader form).
 
 ### Fixed
 
@@ -94,15 +94,15 @@ reflection rather than gem code.
 
 ### Dependency
 
-- Tracks `axn` git `main` (`github: "teamshares/axn", branch: "main"`) — this release needs axn core
-  primitives (PRO-2842 / 2875 / 2878 / 2880 / 2881 / 2888 / 2921) that have no tagged axn release
-  yet. `Gemfile.lock` is gitignored; `bundle update axn` to advance.
+- Tracks `axn` git `main` (`github: "teamshares/axn", branch: "main"`) — this release needs recent
+  axn core reflection, tool-registry, and namespaced-config primitives that have no tagged axn
+  release yet. `Gemfile.lock` is gitignored; `bundle update axn` to advance.
 
 ## 0.1.1
 
-- Migrated internal configuration off hand-rolled code onto the upstream `Axn::Configurable` DSL (added in axn PRO-2769). The public surface is unchanged: `Axn::MCP.config.mcp_text_content`, per-tool `mcp_text_content(...)` overrides, and `resolved_mcp_text_content` all behave as before.
+- Migrated internal configuration off hand-rolled code onto the upstream `Axn::Configurable` DSL. The public surface is unchanged: `Axn::MCP.config.mcp_text_content`, per-tool `mcp_text_content(...)` overrides, and `resolved_mcp_text_content` all behave as before.
 - `Axn::MCP::Tool` now declares a base error headline, default `"Tool call failed"` (leveraging axn's error-prefix feature). Failures with no explicit reason — validation errors, unexpected exceptions, bare `fail!` — now surface as the headline alone instead of axn's generic `"Something went wrong"`, and explicit reasons are contextualized as `"<headline>: <reason>"`. The headline is a proper `Axn::MCP.config.error_headline` setting (String, non-blank), resolved fresh on every failure — set it gem-wide with no reload or require-order caveat. Subclasses can still override with their own base `error "..."`, which wins over the configured headline, or opt a single message out with `fail!("...", standalone: true)`. The headline presentation is uniform across `call` and `call!`: a failing `call!` raises an `Axn::Failure` whose `#message` matches `result.error` (e.g. `"Tool call failed: <reason>"`).
-- Requires an `axn` version that ships `Axn::Configurable`, base-`error` prefixing, and the `standalone:` message flag (axn PRO-2746 / PRO-2820 / PRO-2832).
+- Requires an `axn` version that ships `Axn::Configurable`, base-`error` prefixing, and the `standalone:` message flag.
 
 ## 0.1.0
 

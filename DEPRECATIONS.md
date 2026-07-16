@@ -13,7 +13,7 @@ A transitional `0.1.x → 0.2.0` migration table at the bottom of `README.md` (m
 `Axn::MCP::Tool` base, `.define`, `mcp_text_content`, `error_headline`, bang-methods) is gone
 entirely and there's nothing to migrate from.
 
-### `Axn::MCP::Tool` (subclass base) — PRO-2923
+### `Axn::MCP::Tool` (subclass base)
 
 Retired in favor of the author-once model: author a plain Axn and expose it with
 `Axn::MCP.wrap` (per tool) or `Axn::MCP.tools` (every registered `:mcp` tool). The base's
@@ -50,7 +50,7 @@ end
 Axn::MCP.wrap(MyTool)          # -> a ready-to-register ::MCP::Tool subclass
 ```
 
-### `Axn::MCP::Tool.define` (inline factory) — PRO-2923
+### `Axn::MCP::Tool.define` (inline factory)
 
 Removed alongside the base (the raising tombstone above covers it). It was pure sugar over
 composing two public primitives; use them directly:
@@ -63,7 +63,7 @@ Axn::MCP.wrap(
 )
 ```
 
-### `Axn::MCP.wrap(mcp_text_content:)` kwarg — PRO-2923
+### `Axn::MCP.wrap(mcp_text_content:)` kwarg
 
 Renamed to `present_as:` (unifying the "structured data vs. the Axn message" render toggle with
 `axn-ruby_llm`'s `present_as`, and dropping the redundant `mcp_` prefix that doubled up inside the
@@ -75,7 +75,7 @@ from `Axn::MCP.wrap` (`lib/axn/mcp/wrap.rb`).
 
 ## Removed (no stub)
 
-- **`present_as` config setting was `mcp_text_content`** (PRO-2923) — the gem-wide
+- **`present_as` config setting was `mcp_text_content`** — the gem-wide
   `Axn::MCP.config.present_as` and the per-class `configure(:mcp) { |c| c.present_as = ... }`
   setting were renamed from `mcp_text_content`. Nothing is released, so this is a hard rename: the
   old `config.mcp_text_content` raises `NoMethodError` and `configure(:mcp) { |c| c.mcp_text_content
@@ -83,7 +83,7 @@ from `Axn::MCP.wrap` (`lib/axn/mcp/wrap.rb`).
   they aren't given a pointed migration message the way the `wrap` kwarg is. Use `present_as`
   (`:structured` / `:message`).
 
-- **`Axn::MCP.config.error_headline`** (PRO-2923) — the gem no longer imposes a `"Tool call
+- **`Axn::MCP.config.error_headline`** — the gem no longer imposes a `"Tool call
   failed"` headline on failures. MCP error responses now carry the Axn's own `result.error`.
   A tool that wants a generic failure message declares its own axn base `error "..."` (standard
   axn practice), which is per-tool rather than gem-wide.
