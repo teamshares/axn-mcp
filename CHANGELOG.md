@@ -6,6 +6,11 @@
   (`Axn.register_tool_adapter(:mcp)`, PRO-2923). A consumer can build its server tool list from
   `Axn.tools_for(:mcp).map { |t| Axn::MCP.wrap(t) }` — resolving bare `tool` membership, `tool
   :mcp`, and implicit `configure(:mcp)` membership — instead of a hand-maintained array.
+- Added `Axn::MCP.tools` (PRO-2923), a zero-arg convenience that returns every registered `:mcp`
+  tool already wrapped as a ready-to-register `::MCP::Tool` (`Axn.tools_for(:mcp).map { |t|
+  Axn::MCP.wrap(t) }`) — symmetric with `Axn::RubyLLM.tools`. Register with
+  `MCP::Server.new(tools: Axn::MCP.tools, ...)`; per-tool customization comes from each class's own
+  `configure(:mcp)` / `tool name:` / `description`, honored inside `wrap`.
 - `Axn::MCP.wrap` now derives the tool name from axn core's canonical `tool_name` (PRO-2923),
   replacing `::MCP::StringUtils.handle_from_class_name`. This honors a `tool name: "..."` override
   declared on the wrapped Axn and its `tool_name_stripped_prefixes`, and unifies name derivation

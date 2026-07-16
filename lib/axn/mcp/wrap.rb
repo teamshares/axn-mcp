@@ -17,6 +17,16 @@ module Axn
       # semantics can call the original wrapped class's own .call! directly (unwrapped).
       VALID_MCP_TEXT_CONTENT = %i[structured message].freeze
 
+      # The gem-level convenience for building a ready-to-register MCP tool list (PRO-2923),
+      # symmetric with `Axn::RubyLLM.tools`: enumerate every Axn that belongs to the :mcp adapter
+      # (via axn core's process-global registry) and wrap each one. Zero-arg by design -- per-tool
+      # customization comes from each class's own `configure(:mcp) { ... }` (honored inside `wrap`)
+      # and its `tool name:`/`description`, not per-call kwargs -- so a consumer registers tools with
+      # just `MCP::Server.new(tools: Axn::MCP.tools, ...)` instead of a hand-maintained array.
+      def tools
+        Axn.tools_for(:mcp).map { |axn_class| wrap(axn_class) }
+      end
+
       def wrap(axn_class, description: nil, name: nil, title: nil, icons: nil, meta: nil, annotations: nil, mcp_text_content: nil)
         validate_mcp_text_content!(mcp_text_content)
         resolved_name = resolve_wrap_tool_name(axn_class, name)
