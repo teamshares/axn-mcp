@@ -27,8 +27,10 @@ RSpec.describe "MCP Server Integration", type: :integration do
   end
 
   describe "tool registration" do
-    let(:greet_tool) do
-      Class.new(Axn::MCP::Tool) do
+    let(:greet_axn) do
+      Class.new do
+        include Axn
+
         def self.name
           "GreetTool"
         end
@@ -43,7 +45,7 @@ RSpec.describe "MCP Server Integration", type: :integration do
       end
     end
 
-    let(:tools) { [greet_tool] }
+    let(:tools) { [Axn::MCP.wrap(greet_axn)] }
 
     it "lists tools with auto-generated schemas" do
       response = parse_response(server.handle_json(json_rpc_request("tools/list")))
@@ -76,22 +78,25 @@ RSpec.describe "MCP Server Integration", type: :integration do
   end
 
   describe "server_context injection" do
-    let(:context_tool) do
-      Class.new(Axn::MCP::Tool) do
+    let(:context_axn) do
+      Class.new do
+        include Axn
+
         def self.name
           "ContextTool"
         end
 
         description "Return server context info"
+        expects :server_context, on: :ambient_context, type: Object, optional: true
         exposes :user_id, type: Integer
 
         def call
-          expose user_id: server_context[:user_id]
+          expose user_id: server_context&.dig(:user_id)
         end
       end
     end
 
-    let(:tools) { [context_tool] }
+    let(:tools) { [Axn::MCP.wrap(context_axn)] }
 
     it "passes server_context to tool" do
       request = json_rpc_request("tools/call", { name: "context_tool", arguments: {} })
@@ -103,8 +108,10 @@ RSpec.describe "MCP Server Integration", type: :integration do
   end
 
   describe "error handling" do
-    let(:failing_tool) do
-      Class.new(Axn::MCP::Tool) do
+    let(:failing_axn) do
+      Class.new do
+        include Axn
+
         def self.name
           "FailingTool"
         end
@@ -117,21 +124,52 @@ RSpec.describe "MCP Server Integration", type: :integration do
       end
     end
 
-    let(:tools) { [failing_tool] }
+    let(:tools) { [Axn::MCP.wrap(failing_axn)] }
 
-    it "returns error response for failed actions, prefixing the reason with the base headline" do
+    it "returns error response surfacing the raw result.error for an explicit fail! reason" do
       request = json_rpc_request("tools/call", { name: "failing_tool", arguments: {} })
       response = parse_response(server.handle_json(request))
 
       result = response[:result]
       expect(result[:isError]).to be true
-      expect(result[:content].first[:text]).to eq("Tool call failed: email taken")
+      expect(result[:content].first[:text]).to eq("email taken")
+    end
+  end
+
+  describe "error handling for a bare fail!" do
+    let(:bare_failing_axn) do
+      Class.new do
+        include Axn
+
+        def self.name
+          "BareFailingTool"
+        end
+
+        description "A tool that fails without a reason"
+
+        def call
+          fail!
+        end
+      end
+    end
+
+    let(:tools) { [Axn::MCP.wrap(bare_failing_axn)] }
+
+    it "surfaces axn's default failure message" do
+      request = json_rpc_request("tools/call", { name: "bare_failing_tool", arguments: {} })
+      response = parse_response(server.handle_json(request))
+
+      result = response[:result]
+      expect(result[:isError]).to be true
+      expect(result[:content].first[:text]).to eq("Something went wrong")
     end
   end
 
   describe "exception handling" do
-    let(:exception_tool) do
-      Class.new(Axn::MCP::Tool) do
+    let(:exception_axn) do
+      Class.new do
+        include Axn
+
         def self.name
           "ExceptionTool"
         end
@@ -144,27 +182,29 @@ RSpec.describe "MCP Server Integration", type: :integration do
       end
     end
 
-    let(:tools) { [exception_tool] }
+    let(:tools) { [Axn::MCP.wrap(exception_axn)] }
 
-    it "returns error response for raised exceptions" do
+    it "returns error response for raised exceptions with axn's default message" do
       request = json_rpc_request("tools/call", { name: "exception_tool", arguments: {} })
       response = parse_response(server.handle_json(request))
 
       result = response[:result]
       expect(result[:isError]).to be true
-      expect(result[:content].first[:text]).to be_present
+      expect(result[:content].first[:text]).to eq("Something went wrong")
     end
   end
 
   describe "complex tool with multiple fields" do
-    let(:create_user_tool) do
-      Class.new(Axn::MCP::Tool) do
+    let(:create_user_axn) do
+      Class.new do
+        include Axn
+
         def self.name
           "CreateUserTool"
         end
 
         description "Create a new user"
-        read_only!
+        semantic_hints :read_only
 
         expects :email, type: String, description: "User email"
         expects :role, inclusion: { in: %w[admin member guest] }, description: "User role"
@@ -179,7 +219,7 @@ RSpec.describe "MCP Server Integration", type: :integration do
       end
     end
 
-    let(:tools) { [create_user_tool] }
+    let(:tools) { [Axn::MCP.wrap(create_user_axn)] }
 
     it "lists tool with full schema including enums and optional fields" do
       response = parse_response(server.handle_json(json_rpc_request("tools/list")))
@@ -217,8 +257,10 @@ RSpec.describe "MCP Server Integration", type: :integration do
   end
 
   describe "tool with custom success message" do
-    let(:message_tool) do
-      Class.new(Axn::MCP::Tool) do
+    let(:message_axn) do
+      Class.new do
+        include Axn
+
         def self.name
           "MessageTool"
         end
@@ -232,7 +274,7 @@ RSpec.describe "MCP Server Integration", type: :integration do
       end
     end
 
-    let(:tools) { [message_tool] }
+    let(:tools) { [Axn::MCP.wrap(message_axn)] }
 
     it "uses custom success message in response" do
       request = json_rpc_request("tools/call", { name: "message_tool", arguments: {} })
@@ -253,8 +295,10 @@ RSpec.describe "MCP Server Integration", type: :integration do
         Axn::MCP.config.mcp_text_content = original
       end
 
-      let(:structured_tool) do
-        Class.new(Axn::MCP::Tool) do
+      let(:structured_axn) do
+        Class.new do
+          include Axn
+
           def self.name
             "StructuredTool"
           end
@@ -269,7 +313,7 @@ RSpec.describe "MCP Server Integration", type: :integration do
         end
       end
 
-      let(:tools) { [structured_tool] }
+      let(:tools) { [Axn::MCP.wrap(structured_axn)] }
 
       it "uses success message in response when config is :message and tool has no override" do
         request = json_rpc_request("tools/call", { name: "structured_tool", arguments: {} })
@@ -290,13 +334,14 @@ RSpec.describe "MCP Server Integration", type: :integration do
         Axn::MCP.config.mcp_text_content = original
       end
 
-      let(:override_tool) do
-        Class.new(Axn::MCP::Tool) do
+      let(:override_axn) do
+        Class.new do
+          include Axn
+
           def self.name
             "OverrideTool"
           end
 
-          mcp_text_content :structured
           description "Overrides to structured text"
           exposes :x, type: Integer
           success "Ignored"
@@ -307,7 +352,9 @@ RSpec.describe "MCP Server Integration", type: :integration do
         end
       end
 
-      let(:tools) { [override_tool] }
+      # wrap's own mcp_text_content: kwarg is the most-local per-tool override and wins over the
+      # gem-wide config default of :message.
+      let(:tools) { [Axn::MCP.wrap(override_axn, mcp_text_content: :structured)] }
 
       it "per-tool :structured wins over config :message" do
         request = json_rpc_request("tools/call", { name: "override_tool", arguments: {} })
@@ -320,21 +367,28 @@ RSpec.describe "MCP Server Integration", type: :integration do
     end
   end
 
-  describe "factory-defined tool" do
-    let(:factory_tool) do
-      Axn::MCP::Tool.define(
-        description: "Search for items",
+  describe "factory-built tool wrapped via Axn::MCP.wrap" do
+    let(:factory_axn) do
+      Axn::Factory.build(
         expects: { query: { type: String, description: "Search query" } },
         exposes: { count: { type: Integer } },
-        annotations: { read_only_hint: true },
       ) do
         expose count: query.length
       end
     end
 
+    let(:factory_tool) do
+      Axn::MCP.wrap(
+        factory_axn,
+        name: "search",
+        description: "Search for items",
+        annotations: { read_only_hint: true },
+      )
+    end
+
     let(:tools) { [factory_tool] }
 
-    it "works with factory-defined tools" do
+    it "works end-to-end with factory-built, wrapped tools" do
       response = parse_response(server.handle_json(json_rpc_request("tools/list")))
       tool = response[:result][:tools].first
 
@@ -347,22 +401,32 @@ RSpec.describe "MCP Server Integration", type: :integration do
       expect(call_response[:result][:structuredContent]).to eq({ count: 5 })
     end
 
-    it "supports mcp_text_content in define options" do
-      message_tool = Axn::MCP::Tool.define(
-        description: "Returns message",
+    it "honors mcp_text_content passed to wrap" do
+      message_axn = Axn::Factory.build(
         exposes: { value: { type: Integer } },
-        mcp_text_content: :message,
+        success: "Returned message",
       ) do
         expose value: 10
       end
-      # When mcp_text_content is :message we use result.success; without success() DSL that may be default Axn message
-      expect(message_tool.mcp_text_content).to eq(:message)
+      message_tool = Axn::MCP.wrap(
+        message_axn,
+        name: "message_returner",
+        description: "Returns message",
+        mcp_text_content: :message,
+      )
+
+      response = message_tool.call(value: 10, server_context: {})
+
+      expect(response).to be_a(MCP::Tool::Response)
+      expect(response.content.first[:text]).to eq("Returned message")
     end
   end
 
   describe "of:/shape: items schema — end-to-end" do
-    let(:list_tool) do
-      Class.new(Axn::MCP::Tool) do
+    let(:list_axn) do
+      Class.new do
+        include Axn
+
         def self.name
           "ListIntegrationsTool"
         end
@@ -380,6 +444,8 @@ RSpec.describe "MCP Server Integration", type: :integration do
         end
       end
     end
+
+    let(:list_tool) { Axn::MCP.wrap(list_axn) }
 
     it "emits items in output_schema" do
       items = list_tool.output_schema.to_h[:properties][:integrations][:items]

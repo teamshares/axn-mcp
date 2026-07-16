@@ -23,7 +23,6 @@ module Axn
     class SchemaError < StandardError; end
 
     setting :mcp_text_content, default: :structured, one_of: %i[structured message], overridable: true
-    setting :error_headline, default: "Tool call failed", validate: ->(v) { v.is_a?(String) && !v.strip.empty? }
 
     # Shared deprecator for this gem's own deprecated API (e.g. the legacy annotation
     # bang-methods -- see lib/axn/mcp/tool.rb). A dedicated ActiveSupport::Deprecation instance,

@@ -2,7 +2,11 @@
 
 Build [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) tools using [Axn](https://github.com/teamshares/axn)'s declarative `expects`/`exposes` contract. This gem wraps the official [MCP Ruby SDK](https://github.com/modelcontextprotocol/ruby-sdk) and auto-generates JSON schemas from your Axn field declarations.
 
-This gem is scoped to MCP **Tools** only. `MCP::Server` also supports `resources`, `resource_templates`, and `prompts` as first-class concepts — `Axn::MCP::Tool`/`Axn::MCP.wrap` don't adapt an Axn into any of those, and there's no `Axn::MCP.wrap_as_resource` or equivalent. If you need those, register them with `MCP::Server` directly per the [MCP Ruby SDK documentation](https://github.com/modelcontextprotocol/ruby-sdk).
+**Author once, expose anywhere.** You write a plain Axn — a normal action, usable by any caller — and this gem exposes it as an `::MCP::Tool` with `Axn::MCP.wrap` (one tool) or `Axn::MCP.tools` (every registered tool at once). The Axn stays a plain Axn: called directly it returns an `Axn::Result`, with no MCP awareness. The same action can be exposed to other adapters (e.g. an `axn-ruby_llm`) the same way, from the same class.
+
+> **Migrating from the `Axn::MCP::Tool` subclass base?** It was retired in favor of `Axn::MCP.wrap` (see [DEPRECATIONS.md](DEPRECATIONS.md)). Subclassing it now raises with a migration message. The change is a one-liner per tool — see [Exposing tools](#exposing-tools).
+
+This gem is scoped to MCP **Tools** only. `MCP::Server` also supports `resources`, `resource_templates`, and `prompts` as first-class concepts — `Axn::MCP.wrap` doesn't adapt an Axn into any of those, and there's no `Axn::MCP.wrap_as_resource` or equivalent. If you need those, register them with `MCP::Server` directly per the [MCP Ruby SDK documentation](https://github.com/modelcontextprotocol/ruby-sdk).
 
 ## Installation
 
@@ -20,10 +24,12 @@ bundle install
 
 ## Quick Start
 
-Define an MCP tool by inheriting from `Axn::MCP::Tool`:
+Write a plain Axn, then expose it with `Axn::MCP.wrap`:
 
 ```ruby
-class GreetUser < Axn::MCP::Tool
+class GreetUser
+  include Axn
+
   description "Greet a user by name"
 
   expects :name, type: String, description: "The user's name"
@@ -33,14 +39,18 @@ class GreetUser < Axn::MCP::Tool
     expose greeting: "Hello, #{name}!"
   end
 end
+
+GreetUserTool = Axn::MCP.wrap(GreetUser) # => an ::MCP::Tool subclass, ready to register
 ```
 
-That's it. The gem automatically:
+`Axn::MCP.wrap` returns a genuine `::MCP::Tool` subclass. The gem automatically:
 
 - Generates `inputSchema` from your `expects` declarations
 - Generates `outputSchema` from your `exposes` declarations
 - Converts `Axn::Result` to `MCP::Tool::Response`
 - Serializes exposed data to JSON-safe `structured_content`
+
+`GreetUser` itself is untouched — `GreetUser.call(name: "Alice")` still returns a plain `Axn::Result`.
 
 `inputSchema`/`outputSchema` generation and exposed-value serialization are both sourced from
 `axn` core's own reflection APIs (`Axn::Reflection::Schema` and `Axn::Reflection::Values`) — this
@@ -67,26 +77,115 @@ catching that would only cover literal defaults, not custom validators, callable
 lookups, so the caveat exists either way. This is the one documented spot where the input schema is
 *looser* than runtime rather than stricter (tracked as a known gap, not a bug — see PRO-2879).
 
-## Usage
+## Exposing tools
 
-### Basic Tool Definition
+An Axn is just an action; the gem turns it into an `::MCP::Tool` at the edge. There are three ways
+in, all producing the same kind of `::MCP::Tool` subclass.
+
+### One tool: `Axn::MCP.wrap`
 
 ```ruby
-class CreateNote < Axn::MCP::Tool
-  description "Create a new note"
-
-  expects :title, type: String, description: "Note title"
-  expects :content, type: String, description: "Note body"
-  expects :tags, type: Array, optional: true, description: "Optional tags"
-
-  exposes :note_id, type: Integer, description: "ID of the created note"
-
-  def call
-    note = Note.create!(title:, content:, tags: tags || [])
-    expose note_id: note.id
-  end
-end
+GreetUserTool = Axn::MCP.wrap(GreetUser)
 ```
+
+`wrap(axn_class, description: nil, name: nil, title: nil, icons: nil, meta: nil, annotations: nil, mcp_text_content: nil)`:
+
+- **`description:`** defaults to the Axn's own `.description`. Pass it to override.
+- **`name:`** defaults to `axn_class.tool_name` — axn core's canonical, provider-safe name, which
+  honors a `tool name: "..."` override on the Axn and any configured `tool_name_stripped_prefixes`
+  (e.g. `GreetUser` → `"greet_user"`). Pass `name:` to override. This matters if you register the
+  tool inline (`tools: [Axn::MCP.wrap(GreetUser)]`) rather than assigning it to a constant. If the
+  wrapped Axn is *truly* anonymous (no class name, no `axn_name`), `wrap` raises `ArgumentError`
+  rather than ship an unusable, unnamed tool — pass `name:` in that case.
+- **`annotations:`** / **`mcp_text_content:`** / **`title:`** / **`icons:`** / **`meta:`** — all
+  optional; see the sections below. Omitted values fall through to the Axn's own declarations
+  (`semantic_hints`, `configure(:mcp)`) or `::MCP::Tool`'s defaults.
+
+The original class is never modified — the transport concerns (schema, `server_context` routing,
+response mapping) live entirely on the generated subclass:
+
+```ruby
+GreetUserTool.input_schema_value.to_h[:properties].keys        # => [:name]
+GreetUserTool.call(name: "Bob", server_context: { user_id: 42 }) # => MCP::Tool::Response
+GreetUser.call(name: "Alice")                                    # => Axn::Result (untouched)
+```
+
+Unlike the retired base, the generated subclass has no dual mode: its `.call` **always** returns
+`MCP::Tool::Response`, and it has no `.call!` (a bang that just delegated to `.call` would promise
+raise-on-failure semantics it can't deliver — call the original Axn's `.call!` if you want those).
+
+### Every registered tool: `Axn::MCP.tools`
+
+Mark an Axn as an MCP tool with `tool :mcp` (axn core's tool-registry DSL), and `Axn::MCP.tools`
+returns them all, already wrapped — no hand-maintained array:
+
+```ruby
+class ListCompanies
+  include Axn
+  tool :mcp
+  description "List companies"
+  # ...
+end
+
+MCP::Server.new(name: "my-server", version: "1.0.0", tools: Axn::MCP.tools)
+```
+
+`Axn::MCP.tools` is `Axn.tools_for(:mcp).map { |axn| Axn::MCP.wrap(axn) }` — zero-arg by design.
+Per-tool customization comes from each class's own declarations (`tool name:`, `description`,
+`semantic_hints`, `configure(:mcp)`), all honored inside `wrap`. It's symmetric with the same
+pattern in sibling adapter gems (e.g. `Axn::RubyLLM.tools`).
+
+A class becomes a `:mcp` member via any of: `tool :mcp` (or bare `tool`, meaning every registered
+adapter); a `configure(:mcp) { ... }` block; or living under a configured `Axn.config.tool_paths`
+directory. For a curated subset instead of all of them, filter the registry yourself:
+`Axn.tools_for(:mcp).select { ... }.map { |a| Axn::MCP.wrap(a) }`.
+
+### One-off inline tools
+
+There's no `Axn::MCP.define`; the inline primitive lives in axn core. For a throwaway tool, build a
+plain Axn with `Axn::Factory.build` (block-as-`#call`, no class needed) and wrap it:
+
+```ruby
+SearchTool = Axn::MCP.wrap(
+  Axn::Factory.build(
+    expects: { query: { type: String, description: "Search query" } },
+    exposes: { results: { type: Array } },
+  ) { expose results: Item.search(query) },
+  name: "search",
+  description: "Search for items",
+  annotations: { read_only_hint: true },
+)
+```
+
+`Axn::Factory.build` carries the action's behavior (`expects`/`exposes`/`success`/`error`/hooks/…);
+the MCP-facing bits (`name:`/`description:`/`annotations:`/`mcp_text_content:`) go to `wrap`. For a
+multi-adapter one-off, build the Axn once and hand it to each adapter's `wrap`.
+
+### Mixing with native `::MCP::Tool` tools
+
+Because `wrap` returns a real `::MCP::Tool` subclass, wrapped Axns and hand-written MCP tools
+compose in one array — splat `Axn::MCP.tools` alongside anything else:
+
+```ruby
+MCP::Server.new(
+  name: "my-server", version: "1.0.0",
+  server_context: { user_id: current_user.id },
+  tools: [
+    *Axn::MCP.tools,                                   # every registered :mcp Axn, wrapped
+    NativeSearchTool,                                  # a plain MCP::Tool subclass
+    MCP::Tool.define(name: "ping", description: "…") { |_args, _sc| MCP::Tool::Response.new([...]) },
+  ],
+)
+```
+
+`server_context` flows identically to both: native tools read it in `call(args, server_context:)`;
+wrapped Axns get it routed into `ambient_context` (see [Server Context](#server-context)).
+
+## Field declarations & schema
+
+The schema mappings below are axn core reflection surfaced through `wrap` — declare fields on a
+plain Axn (`include Axn`), and the shapes appear on `Axn::MCP.wrap(TheAxn).input_schema_value` /
+`.output_schema`.
 
 ### Field Descriptions
 
@@ -263,7 +362,9 @@ Annotated members are fully typed; unannotated `Data.define` members (`source`, 
 When using `model: true`, the schema automatically generates an `_id` field with an appropriate description:
 
 ```ruby
-class UpdateUser < Axn::MCP::Tool
+class UpdateUser
+  include Axn
+
   description "Update a user's profile"
 
   expects :user, model: true
@@ -310,9 +411,9 @@ Generates:
 }
 ```
 
-### Annotations
+## Annotations
 
-Declare `axn` core's generic `semantic_hints` DSL (`semantic_hints :read_only, :idempotent, ...`) and this gem maps them to MCP annotations automatically. This gem registers `:open_world`/`:closed_world` as additional semantic hints (via `Axn.extension_config.register_semantic_hint` — no core change needed for MCP-only vocabulary):
+Declare `axn` core's generic `semantic_hints` DSL (`semantic_hints :read_only, :idempotent, ...`) on your Axn, and `Axn::MCP.wrap` maps them to MCP annotations automatically. This gem registers `:open_world`/`:closed_world` as additional semantic hints (via `Axn.extension_config.register_semantic_hint` — no core change needed for MCP-only vocabulary):
 
 | Declared `semantic_hints` | Default annotation      |
 | -------------------------- | ------------------------ |
@@ -323,123 +424,53 @@ Declare `axn` core's generic `semantic_hints` DSL (`semantic_hints :read_only, :
 | `:closed_world`             | `open_world_hint: false` |
 
 ```ruby
-class ReadOnlyTool < Axn::MCP::Tool
+class FetchData
+  include Axn
   description "Fetch data without side effects"
   semantic_hints :read_only, :closed_world
-  # annotations now include read_only_hint: true, destructive_hint: false, open_world_hint: false
-
+  # Axn::MCP.wrap(FetchData) => annotations include read_only_hint: true, destructive_hint: false, open_world_hint: false
   # ...
 end
 ```
 
-`open_world`/`closed_world` (no bang) are shorthand for declaring just that one hint:
+For anything `semantic_hints` doesn't cover (a custom `title:`, or an annotation with no corresponding hint), pass `annotations:` to `wrap` directly — an explicit `annotations:` wins over hint-derived defaults:
 
 ```ruby
-class DangerousTool < Axn::MCP::Tool
-  description "Delete all the things"
-  semantic_hints :destructive, :idempotent
-  open_world # equivalent to: semantic_hints(*(semantic_hints + [:open_world]))
-
-  # ...
-end
+Axn::MCP.wrap(MyAxn, annotations: {
+  read_only_hint: true,
+  idempotent_hint: true,
+  title: "My Custom Tool",
+})
 ```
 
-For anything `semantic_hints` doesn't cover (a custom `title:`, or an annotation with no corresponding hint), set `annotations(...)` directly:
+## Title, Icons, and Metadata
+
+`::MCP::Tool` supports `title`/`icons`/`meta` alongside `description`/`annotations`. Pass them as `wrap` kwargs — a wrapped Axn has no `::MCP::Tool` class body of its own to declare them in:
 
 ```ruby
-class CustomAnnotations < Axn::MCP::Tool
-  annotations(
-    read_only_hint: true,
-    idempotent_hint: true,
-    title: "My Custom Tool",
-  )
-
-  # ...
-end
-```
-
-An explicit `annotations(...)` call always wins over hint-derived defaults, on this class or any ancestor. `semantic_hints`-derived annotations are re-derived from the full set of declared hints each time (so declaring `:open_world` and later `:closed_world` ends with only `open_world_hint: false` applied, not both), and a subclass that inherits `semantic_hints` from a base class without redeclaring them still gets the right annotations.
-
-> **Deprecated:** `read_only!`/`destructive!`/`idempotent!`/`open_world!`/`closed_world!` (bang methods) still work, as thin aliases over `semantic_hints` — but emit a deprecation warning and will be removed in a future release. Prefer `semantic_hints`/`open_world`/`closed_world` directly, as shown above.
-
-### Title, Icons, and Metadata
-
-`::MCP::Tool` also supports `title`/`icons`/`meta`, alongside `description`/`annotations`. A class subclassing `Axn::MCP::Tool` gets these for free via plain inheritance — declare them in the class body like any other `::MCP::Tool` class method:
-
-```ruby
-class SearchTool < Axn::MCP::Tool
-  description "Search for items"
-  title "Item Search"
-  icons [{ src: "https://example.com/icon.png", mimeType: "image/png" }]
-  meta({ version: "1.0" })
-
-  # ...
-end
-```
-
-`Axn::MCP.wrap` accepts the same three as `title:`/`icons:`/`meta:` kwargs (see [Wrapping a Plain Axn](#wrapping-a-plain-axn-with-axnmcpwrap) below) — a wrapped Axn has no class body of its own to declare them in, so `wrap` is the only way to set them for that path.
-
-### Factory-Style Definition
-
-For quick one-off tools:
-
-```ruby
-SearchTool = Axn::MCP::Tool.define(
+Axn::MCP.wrap(
+  SearchAxn,
   description: "Search for items",
-  expects: { query: { type: String, description: "Search query" } },
-  exposes: { results: { type: Array } },
-  annotations: { read_only_hint: true },
-) do
-  expose results: Item.search(query)
-end
+  title: "Item Search",
+  icons: [{ src: "https://example.com/icon.png", mimeType: "image/png" }],
+  meta: { version: "1.0" },
+)
 ```
 
-### Wrapping a Plain Axn with `Axn::MCP.wrap`
+All are omitted (left at `::MCP::Tool`'s own defaults) unless passed.
 
-If you already have an Axn action that doesn't subclass `Axn::MCP::Tool` — and you don't want it to, e.g. because it's shared with non-MCP callers — expose it as an `::MCP::Tool` with `Axn::MCP.wrap` instead of rewriting it:
+## Server Context
+
+A tool that needs server-injected data declares a `server_context` field routed through axn core's
+`ambient_context`, and reads it with safe navigation:
 
 ```ruby
-class GreetPlainly
+class AuthenticatedAction
   include Axn
 
-  expects :name, type: String
-  expects :server_context, on: :ambient_context, type: Object, optional: true
-  exposes :greeting, type: String
-
-  def call
-    expose greeting: "Hello, #{name}! (user #{server_context&.dig(:user_id).inspect})"
-  end
-end
-
-GreetPlainlyTool = Axn::MCP.wrap(GreetPlainly, description: "Greets someone")
-```
-
-`GreetPlainly` itself is untouched: `GreetPlainly.call(name: "Alice")` still returns a plain `Axn::Result`, with no MCP awareness at all. `Axn::MCP.wrap` generates a *separate* `::MCP::Tool` subclass that carries all the MCP transport concerns (schema, `server_context` routing, response mapping) via the same path `Axn::MCP::Tool#call` itself uses:
-
-```ruby
-GreetPlainlyTool.input_schema_value.to_h[:properties].keys # => [:name] (server_context excluded)
-GreetPlainlyTool.call(name: "Bob", server_context: { user_id: 42 }) # => MCP::Tool::Response
-```
-
-If a wrapped Axn needs server-injected data, it must declare the field itself, the same way `Axn::MCP::Tool` does — `expects :server_context, on: :ambient_context, type: Object` (not, say, `expects :user_id, on: :ambient_context` directly) — and read it with the same `server_context&.dig(...)` convention used throughout this README. `Axn::MCP.wrap` doesn't inject anything the wrapped class didn't ask for; it just plumbs the `server_context:` kwarg passed to `.call` into `ambient_context:` before invoking the wrapped Axn.
-
-`wrap` also accepts `name:`, `title:`, `icons:`, `meta:`, `annotations:`, and `mcp_text_content:` (defaulting to the gem-wide `Axn::MCP.config.mcp_text_content`) — `annotations:`/`mcp_text_content:` mirror `Tool.define`'s own options of the same name, and `title:`/`icons:`/`meta:` mirror `::MCP::Tool`'s own class methods of the same name (see [Title, Icons, and Metadata](#title-icons-and-metadata) above); all are omitted (left at `::MCP::Tool`'s own defaults) unless passed. `name:` is `wrap`-specific: `Tool.define` has no equivalent (it takes no `name:` option; a factory tool's MCP name is derived from the anonymous class as usual).
-
-`name:` defaults to a snake-cased version of the wrapped Axn's own class name (e.g. `GreetPlainly` → `"greet_plainly"`) when omitted — this matters if you register the tool inline (`tools: [Axn::MCP.wrap(GreetPlainly, description: "...")]`) rather than assigning the wrapped class to a constant, since an anonymous Ruby class has no name of its own for `wrap` to fall back on. If the wrapped Axn is *also* anonymous with no derivable name, `wrap` raises `ArgumentError` rather than silently registering an unusable, unnamed tool — pass `name:` explicitly in that case.
-
-Unlike `Axn::MCP::Tool`, the generated subclass itself has no dual-mode: its `.call` always returns
-`MCP::Tool::Response`, never a raw `Axn::Result` (that's still true only of the *original*,
-untouched class). For the same reason, the generated subclass has no `.call!` either — a bang
-method that just delegated to `.call` would promise raise-on-failure semantics it doesn't deliver;
-if you want real bang semantics, call the original wrapped class's own `.call!` directly.
-
-### Server Context
-
-`server_context` is automatically available in all tools (no declaration needed):
-
-```ruby
-class AuthenticatedTool < Axn::MCP::Tool
   description "Do something with the current user"
+
+  expects :server_context, on: :ambient_context, type: Object, optional: true
 
   def call
     current_user = server_context&.dig(:user)
@@ -448,45 +479,21 @@ class AuthenticatedTool < Axn::MCP::Tool
 end
 ```
 
-Note the safe navigation (`&.dig`): `server_context` may be `nil` if the tool is invoked directly as a standard Axn action rather than through the MCP server.
-
-The `server_context` field is excluded from the generated `inputSchema` since it's injected by the MCP server, not provided by the LLM. Under the hood, `Axn::MCP::Tool` declares `expects :server_context, on: :ambient_context, type: Object, optional: true` and routes the value passed to `.call(server_context: ...)` through `axn` core's `ambient_context` mechanism — this is also what keeps it out of `inputSchema` (any `on: :ambient_context` field is excluded automatically, not via a hand-rolled list) and what guarantees an explicit `server_context:` replaces any process-wide ambient context for that call, so server-side state can't leak into an MCP invocation.
+`Axn::MCP.wrap` plumbs the `server_context:` kwarg passed to `.call` into `ambient_context:` before
+invoking the wrapped Axn — it doesn't inject anything the class didn't ask for. Declaring the field
+`on: :ambient_context` is also what keeps it **out of `inputSchema`** (any `on: :ambient_context`
+field is excluded automatically, not via a hand-rolled list), and what guarantees an explicit
+`server_context:` replaces any process-wide ambient context for that call, so server-side state
+can't leak into an MCP invocation. `server_context` is `nil` when the Axn is called directly rather
+than through the MCP server (hence the `&.dig`).
 
 `type: Object` (not `Hash`) is deliberate: `server_context`'s actual class depends on how the tool was invoked and which `mcp` gem version is in use. A direct/test-style call (`Tool.call(server_context: {user_id: 1})`) passes whatever raw value you gave it through, which axn's `ambient_context` resolution wraps in an `ActiveSupport::HashWithIndifferentAccess` if it's a plain `Hash` — `#[]`/`#dig`/`is_a?(Hash)` all work regardless of symbol- or string-keyed access; `instance_of?(Hash)`/`#==` against a literal symbol-keyed `Hash` do not. A real `MCP::Server` round-trip (recent `mcp` gem versions) instead passes an `MCP::ServerContext` object, which is not Hash-like at all but transparently delegates arbitrary method calls — including `#dig`/`#[]` — to whatever context object the server was configured with (`MCP::Server.new(server_context: ...)`) via `method_missing`. Reading with `&.dig(...)`/`&.[]` (rather than asserting a specific class) works uniformly across both cases.
 
-#### `MCP::ServerContext`'s richer capabilities
+### `MCP::ServerContext`'s richer capabilities
 
 When invoked through a real `MCP::Server`, `server_context` (an `MCP::ServerContext`) offers more than `#dig`/`#[]` — session-scoped operations that talk back to the calling client, e.g. `server_context.report_progress(50, total: 100, message: "Halfway done")` or `server_context.cancelled?` inside a long-running `#call`. These work today with no changes needed on this gem's side — `server_context` is just handed through untouched. They're **not available** on a direct/test-style call, where `server_context` is a plain `Hash`/`nil` with no such methods.
 
 The exact method set is entirely the `mcp` gem's own surface and evolves with it (check `MCP::ServerContext`'s own source for your installed version) — some methods there are themselves marked deprecated by the SDK independent of anything in this gem. Consult it directly rather than treating any list here as authoritative.
-
-### Dual-Use: MCP Server vs Direct Invocation
-
-Tools automatically adapt their return type based on how they're called:
-
-```ruby
-# Called FROM MCP server (server_context injected) → returns MCP::Tool::Response
-# This happens automatically when registered with MCP::Server
-
-# Called DIRECTLY without server_context → returns Axn::Result
-result = MyTool.call(name: "Alice")
-if result.ok?
-  puts result.greeting
-else
-  puts "Error: #{result.message}"
-end
-
-# Or use call! to raise on failure
-result = MyTool.call!(name: "Bob")
-puts result.greeting
-```
-
-The branching is based on presence of `server_context`:
-
-- **With `server_context`**: Returns `MCP::Tool::Response` (for MCP server compatibility)
-- **Without `server_context`**: Returns `Axn::Result` (standard Axn semantics)
-
-This allows you to test tools or call them from non-MCP contexts using standard Axn patterns.
 
 ## Error Handling
 
@@ -501,18 +508,23 @@ def call
 end
 ```
 
-`Axn::MCP::Tool` declares a base error headline (default `"Tool call failed"`), so the text the
-LLM actually sees is:
+The MCP error response carries the Axn's own `result.error` — the gem imposes no headline of its own:
 
-| Failure                                  | Text shown to the LLM                |
-| ----------------------------------------- | ------------------------------------- |
-| `fail! "User not found"`                  | `"Tool call failed: User not found"`  |
-| Bare `fail!`, a validation error, or an unhandled exception | `"Tool call failed"`                  |
+| Failure                                  | Text shown to the LLM   |
+| ----------------------------------------- | ----------------------- |
+| `fail! "User not found"`                  | `"User not found"`      |
+| Bare `fail!`, a validation error, or an unhandled exception | `"Something went wrong"` (axn's generic default) |
 
-Change the headline **gem-wide** with `Axn::MCP.config.error_headline = "Something broke"` — it's
-read fresh on every failure, so there's no reload or require-order gotcha. Override it **per tool**
-by declaring your own base `error "..."` on the subclass (which wins over the configured headline),
-or opt a single message out of prefixing with `fail!("...", standalone: true)`.
+Want a friendlier generic message than `"Something went wrong"`? Declare your own base `error "..."`
+on the Axn (standard axn practice) — it's per-tool, so each tool can say something specific:
+
+```ruby
+class ChargeCard
+  include Axn
+  error "Could not charge the card"
+  # a bare fail! / validation error / exception now surfaces "Could not charge the card"
+end
+```
 
 Unhandled exceptions are also caught automatically. When an exception occurs:
 
@@ -520,10 +532,22 @@ Unhandled exceptions are also caught automatically. When an exception occurs:
 2. Any configured `on_exception` handlers are triggered (see [Axn configuration](https://github.com/teamshares/axn))
 3. An `MCP::Tool::Response` is returned with `error: true`
 
-Both `fail!` calls and unhandled exceptions result in error responses to the LLM. Calling a tool
-directly with `call!` on a `fail!` raises `Axn::Failure` whose `#message` matches `result.error` —
-i.e. the same prefixed text. For an unhandled exception, `call!` re-raises the *original* exception
-with its original `#message`, which is not the prefixed headline shown to the LLM via `result.error`.
+## Success response text: config and per-tool
+
+By default, successful responses contain a text block with the JSON-serialized `structured_content` (a SHOULD per [MCP spec](https://modelcontextprotocol.io/specification/draft/server/tools#structured-content)). To use the Axn success message instead, set **gem-wide config** once (`Axn::MCP.config.mcp_text_content = :message`), override **per tool** via `configure(:mcp)`, or pass it to `wrap`. Valid values are `:structured` (default) and `:message`. Precedence (most local wins): `wrap`'s `mcp_text_content:` kwarg → the Axn's own `configure(:mcp)` override → the gem-wide config.
+
+```ruby
+# per-tool, on the Axn:
+class MyAction
+  include Axn
+  configure(:mcp) { |c| c.mcp_text_content = :message }
+end
+
+# or at wrap time:
+Axn::MCP.wrap(MyAction, mcp_text_content: :message)
+```
+
+`configure(:mcp)` uses axn core's namespaced config DSL. The same base Axn can be composed with another adapter (e.g. an `axn-ruby_llm` gem) via its own `config_namespace` — each adapter's settings live in their own namespace, so `configure(:mcp)` and `configure(:other_adapter)` on the same class never collide.
 
 ## Integration with MCP Server
 
@@ -536,7 +560,7 @@ require "axn-mcp"
 server = MCP::Server.new(
   name: "my-server",
   version: "1.0.0",
-  tools: [GreetUser, CreateNote, SearchTool],
+  tools: Axn::MCP.tools,              # or an explicit list: [GreetUserTool, SearchTool, ...]
 )
 
 # Use with stdio transport
@@ -545,12 +569,6 @@ transport.open
 ```
 
 For complete server setup, transport options, and advanced configuration, see the [MCP Ruby SDK documentation](https://github.com/modelcontextprotocol/ruby-sdk).
-
-### Success response text: config and per-tool
-
-By default, successful responses contain a text block with the JSON-serialized `structured_content` (a SHOULD per [MCP spec](https://modelcontextprotocol.io/specification/draft/server/tools#structured-content)). To use the Axn success message instead, set **central config** once (`Axn::MCP.config.mcp_text_content = :message`) or override **per tool** with `mcp_text_content :message`. Valid values are `:structured` (default) and `:message`; per-tool overrides config.
-
-Per-tool overrides can also be set through axn core's namespaced `configure`/`axn_configure` DSL: `MyTool.configure(:mcp) { |c| c.mcp_text_content = :message }` (equivalent to `mcp_text_content :message`). This is the same base Axn a class might also compose with another adapter (e.g. an `axn-ruby_llm` gem) via its own `config_namespace` — each adapter's settings live in their own namespace, so `configure(:mcp)` and `configure(:other_adapter)` on the same class never collide.
 
 ## Requirements
 

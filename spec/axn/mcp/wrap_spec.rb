@@ -49,6 +49,39 @@ RSpec.describe "Axn::MCP.wrap" do
     expect(tool.annotations_value.read_only_hint).to be true
   end
 
+  describe "annotations derived from the wrapped Axn's semantic_hints" do
+    def wrap_with_hints(*hints, **wrap_opts)
+      axn = Class.new do
+        include Axn
+
+        def self.name = "HintedAxn"
+        exposes :x, type: String
+        def call = expose(x: "y")
+      end
+      axn.semantic_hints(*hints)
+      Axn::MCP.wrap(axn, description: "d", **wrap_opts)
+    end
+
+    it "maps semantic_hints to MCP annotations (read_only also asserts destructive_hint: false)" do
+      annotations = wrap_with_hints(:read_only, :closed_world).annotations_value
+
+      expect(annotations.read_only_hint).to be true
+      expect(annotations.destructive_hint).to be false
+      expect(annotations.open_world_hint).to be false
+    end
+
+    it "leaves annotations unset when the Axn declares no hints" do
+      expect(wrap_with_hints.annotations_value).to be_nil
+    end
+
+    it "lets an explicit annotations: kwarg win over hint-derived defaults" do
+      annotations = wrap_with_hints(:read_only, annotations: { destructive_hint: true }).annotations_value
+
+      expect(annotations.destructive_hint).to be true
+      expect(annotations.read_only_hint).to be_falsey # explicit hash replaces the hint-derived set wholesale
+    end
+  end
+
   it "sets title/icons/meta from the wrap kwargs, mirroring annotations:" do
     tool = Axn::MCP.wrap(
       plain_axn,

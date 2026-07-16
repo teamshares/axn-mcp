@@ -2,6 +2,25 @@
 
 ## 0.2.0
 
+- **Retired the `Axn::MCP::Tool` subclass base** (PRO-2923) in favor of the author-once model:
+  write a plain Axn and expose it with `Axn::MCP.wrap` (one) or `Axn::MCP.tools` (all registered
+  `:mcp` tools). The base's dual-mode `.call` (returning `Axn::Result` *or* `MCP::Tool::Response`
+  depending on a `server_context:` kwarg) also overrode `input_schema` to a non-Hash
+  `MCP::Tool::InputSchema`, which broke `Axn::RubyLLM.wrap` on the same class — the concrete reason
+  it had to go. `Axn::MCP::Tool` is kept only as a raising tombstone (`class MyTool <
+  Axn::MCP::Tool` and `Axn::MCP::Tool.define(...)` raise `NotImplementedError` with a migration
+  message) and is slated for deletion at 1.0 — see `DEPRECATIONS.md`.
+- **Removed `Axn::MCP::Tool.define`** (PRO-2923). It was sugar over composing two public
+  primitives; build a one-off inline tool with `Axn::MCP.wrap(Axn::Factory.build(...) { ... },
+  name: "...")` instead.
+- **Removed the `Axn::MCP.config.error_headline` setting** (PRO-2923). The gem no longer imposes a
+  `"Tool call failed"` headline; an MCP error response now carries the Axn's own `result.error`. A
+  tool that wants a friendlier generic message declares its own axn base `error "..."` (per-tool,
+  standard axn practice) rather than relying on a gem-wide default.
+- **Removed the annotation bang-methods** (`read_only!`/`destructive!`/`idempotent!`/`open_world!`/
+  `closed_world!`) and the `open_world`/`closed_world` class helpers (PRO-2923) — they lived only
+  on the retired base. Declare `semantic_hints :read_only, :closed_world, ...` on the plain Axn;
+  `Axn::MCP.wrap` maps them, and an explicit `annotations:` kwarg on `wrap` still wins.
 - `Axn::MCP` now registers `:mcp` as a tool adapter with axn core's process-global tool registry
   (`Axn.register_tool_adapter(:mcp)`, PRO-2923). A consumer can build its server tool list from
   `Axn.tools_for(:mcp).map { |t| Axn::MCP.wrap(t) }` — resolving bare `tool` membership, `tool

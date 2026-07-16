@@ -15,7 +15,9 @@ RSpec.describe Axn::MCP::Serializer do
 
     context "when success with exposed data and text_content: :structured (default)" do
       it "uses JSON of structured content for text block" do
-        tool = Class.new(Axn::MCP::Tool) do
+        tool = Class.new do
+          include Axn
+
           exposes :greeting, type: String
 
           def call
@@ -35,7 +37,9 @@ RSpec.describe Axn::MCP::Serializer do
 
     context "when success with no exposed data" do
       it "uses result.success/message for text block" do
-        tool = Class.new(Axn::MCP::Tool) do
+        tool = Class.new do
+          include Axn
+
           success "Done!"
 
           def call
@@ -53,7 +57,9 @@ RSpec.describe Axn::MCP::Serializer do
 
     context "when success with text_content: :message and exposed data" do
       it "uses result.success for text block" do
-        tool = Class.new(Axn::MCP::Tool) do
+        tool = Class.new do
+          include Axn
+
           exposes :greeting, type: String
           success "Custom message"
 
@@ -73,7 +79,9 @@ RSpec.describe Axn::MCP::Serializer do
 
     context "when error" do
       it "uses result.error for text and sets error: true" do
-        tool = Class.new(Axn::MCP::Tool) do
+        tool = Class.new do
+          include Axn
+
           def call
             fail! "email taken"
           end
@@ -82,7 +90,7 @@ RSpec.describe Axn::MCP::Serializer do
 
         response = described_class.result_to_mcp_response(result, [], text_content: :structured)
 
-        expect(response.content.first[:text]).to eq("Tool call failed: email taken")
+        expect(response.content.first[:text]).to eq("email taken")
         expect(response.error?).to be true
       end
     end
