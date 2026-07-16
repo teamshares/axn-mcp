@@ -570,6 +570,25 @@ transport.open
 
 For complete server setup, transport options, and advanced configuration, see the [MCP Ruby SDK documentation](https://github.com/modelcontextprotocol/ruby-sdk).
 
+## Divergences from the raw MCP SDK
+
+`Axn::MCP.wrap` covers the **full `MCP::Tool` configuration surface** — `tool_name`, `title`,
+`description`, `icons`, `inputSchema`, `outputSchema`, tool-level `_meta`, and every annotation hint
+(`read_only_hint`/`destructive_hint`/`idempotent_hint`/`open_world_hint` + annotation `title`) — plus
+`server_context` routing and `MCP::ServerContext`'s session capabilities (`report_progress`,
+`cancelled?`, …). Two `MCP::Tool::Response` **output** affordances are intentionally *not* mapped,
+because an Axn's model is typed structured I/O:
+
+- **Non-text content.** A wrapped tool's response is always a single text block plus
+  `structuredContent` (the JSON of your `exposes`). Image / audio / embedded-resource content
+  (`MCP::Content::Image` / `Audio` / `EmbeddedResource`) and multi-block content are not produced —
+  an Axn has no convention for declaring "this exposed value is binary/media." For a tool that must
+  return media content, register a hand-written `MCP::Tool` directly and splat it alongside
+  `Axn::MCP.tools` (see [Mixing with native tools](#mixing-with-native-mcptool-tools)).
+- **Response-level `_meta`.** The per-response `_meta` channel isn't populated — there's no Axn
+  convention for per-call response metadata; your `exposes` become `structuredContent`. (Tool-*definition*
+  `_meta`, in the tools/list entry, *is* supported — via `wrap`'s `meta:` kwarg.)
+
 ## Requirements
 
 - Ruby >= 3.2.1
