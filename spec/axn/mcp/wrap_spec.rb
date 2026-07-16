@@ -86,6 +86,21 @@ RSpec.describe "Axn::MCP.wrap" do
       expect(tool.name_value).to eq("custom_name")
     end
 
+    it "derives the name via axn core's tool_name, honoring a `tool name:` override on the wrapped Axn" do
+      named = Class.new do
+        include Axn
+
+        def self.name = "SomeVerboseClassName"
+        tool name: "concise"
+        exposes :x, type: String
+        def call = expose(x: "y")
+      end
+
+      tool = Axn::MCP.wrap(named, description: "d")
+
+      expect(tool.name_value).to eq("concise")
+    end
+
     it "raises when neither name: nor a derivable axn_class.name is available" do
       truly_anonymous = Class.new do
         include Axn
@@ -97,6 +112,31 @@ RSpec.describe "Axn::MCP.wrap" do
       expect do
         Axn::MCP.wrap(truly_anonymous, description: "Greets someone")
       end.to raise_error(ArgumentError, /requires name:/)
+    end
+  end
+
+  describe "description defaulting" do
+    let(:described_axn) do
+      Class.new do
+        include Axn
+
+        def self.name = "DescribedAxn"
+        description "From the Axn itself"
+        exposes :x, type: String
+        def call = expose(x: "y")
+      end
+    end
+
+    it "defaults description to the wrapped Axn's own .description when none is passed" do
+      tool = Axn::MCP.wrap(described_axn)
+
+      expect(tool.description).to eq("From the Axn itself")
+    end
+
+    it "still lets an explicit description: win over the Axn's own" do
+      tool = Axn::MCP.wrap(described_axn, description: "Override")
+
+      expect(tool.description).to eq("Override")
     end
   end
 

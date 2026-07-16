@@ -8,6 +8,12 @@ require "active_support/deprecation"
 require_relative "mcp/version"
 Axn.extension_config.register_semantic_hint(:open_world, :closed_world)
 
+# Register :mcp as a tool adapter with axn core's process-global registry (PRO-2923), so a
+# consumer can build its server tool list from `Axn.tools_for(:mcp)` -- resolving bare `tool`
+# membership, `tool :mcp`, and implicit `configure(:mcp)` membership -- instead of a
+# hand-maintained array.
+Axn.register_tool_adapter(:mcp)
+
 module Axn
   module MCP
     extend Axn::Configurable

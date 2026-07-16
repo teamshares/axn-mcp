@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "active_support/core_ext/object/blank"
+
 module Axn
   module MCP
     class << self
@@ -15,13 +17,14 @@ module Axn
       # semantics can call the original wrapped class's own .call! directly (unwrapped).
       VALID_MCP_TEXT_CONTENT = %i[structured message].freeze
 
-      def wrap(axn_class, description:, name: nil, title: nil, icons: nil, meta: nil, annotations: nil, mcp_text_content: nil)
+      def wrap(axn_class, description: nil, name: nil, title: nil, icons: nil, meta: nil, annotations: nil, mcp_text_content: nil)
         validate_mcp_text_content!(mcp_text_content)
         resolved_name = resolve_wrap_tool_name(axn_class, name)
+        resolved_description = description || axn_class.description
 
         Class.new(::MCP::Tool) do
           tool_name(resolved_name)
-          description(description)
+          description(resolved_description)
           title(title) if title
           icons(icons) if icons
           meta(meta) if meta
@@ -67,16 +70,19 @@ module Axn
         raise ArgumentError, "mcp_text_content must be one of #{VALID_MCP_TEXT_CONTENT.map(&:inspect).join(", ")}; got #{mcp_text_content.inspect}"
       end
 
-      # A wrap-generated class is anonymous unless the caller assigns its return value to a
-      # constant -- which doesn't happen for the common `tools: [Axn::MCP.wrap(...)]` inline
-      # usage. Without an explicit tool_name, ::MCP::Tool#name_value falls back to the class's
-      # own (Ruby) name, which is nil for a never-assigned anonymous class, leaving the tool
-      # unregisterable/unusable by MCP::Server. Derive a default from the wrapped Axn's own class
-      # name (the same snake_casing ::MCP::Tool itself uses for a named class) when available,
-      # and fail fast rather than silently ship an unnamed tool when it isn't.
+      # Resolve the provider-facing tool name. An explicit `name:` kwarg (most local to the call
+      # site) wins; otherwise consume axn core's canonical `tool_name` (PRO-2923) -- which honors a
+      # `tool name: "..."` override on the wrapped Axn and its `tool_name_stripped_prefixes`, and
+      # snake_cases the class name -- replacing the old `::MCP::StringUtils.handle_from_class_name`.
+      #
+      # Core's `tool_name` never returns blank: a truly anonymous, never-named class (no class name,
+      # no `axn_name`) falls back to the generic "tool". That's a footgun for wrap's common inline
+      # `tools: [Axn::MCP.wrap(...)]` usage -- every such nameless tool would collide on "tool" and
+      # be unregisterable in practice -- so keep wrap's original fail-fast for that case rather than
+      # silently shipping a tool named "tool"; require an explicit `name:` instead.
       def resolve_wrap_tool_name(axn_class, name)
-        resolved = name || (axn_class.name && ::MCP::StringUtils.handle_from_class_name(axn_class.name))
-        return resolved if resolved
+        return name if name
+        return axn_class.tool_name if axn_class.name.present? || axn_class.axn_name.present?
 
         raise ArgumentError, "Axn::MCP.wrap requires name: when the wrapped Axn has no derivable class name (#{axn_class}.name is nil)"
       end

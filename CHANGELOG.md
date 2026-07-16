@@ -2,6 +2,18 @@
 
 ## 0.2.0
 
+- `Axn::MCP` now registers `:mcp` as a tool adapter with axn core's process-global tool registry
+  (`Axn.register_tool_adapter(:mcp)`, PRO-2923). A consumer can build its server tool list from
+  `Axn.tools_for(:mcp).map { |t| Axn::MCP.wrap(t) }` — resolving bare `tool` membership, `tool
+  :mcp`, and implicit `configure(:mcp)` membership — instead of a hand-maintained array.
+- `Axn::MCP.wrap` now derives the tool name from axn core's canonical `tool_name` (PRO-2923),
+  replacing `::MCP::StringUtils.handle_from_class_name`. This honors a `tool name: "..."` override
+  declared on the wrapped Axn and its `tool_name_stripped_prefixes`, and unifies name derivation
+  with `Axn::RubyLLM.wrap`. An explicit `name:` kwarg still wins, and wrap still fails fast when a
+  truly anonymous Axn (no class name, no `axn_name`) is wrapped without one.
+- `Axn::MCP.wrap`'s `description:` is now optional, defaulting to the wrapped Axn's own
+  `.description` (PRO-2923) — removing the asymmetry with `Axn::RubyLLM.wrap`, which already reads
+  it off the class. An explicit `description:` still wins.
 - Fixed `Axn::MCP::Tool#input_schema` reflecting a conditionally required field (e.g. `expects
   :token, if: :use_token`) as unconditionally required instead of an `allOf` conditional clause.
   Requires axn's new `klass:` param on `Axn::Reflection::Schema.build_input`, added alongside axn's
