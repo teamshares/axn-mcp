@@ -15,11 +15,11 @@ RSpec.describe "Direct Axn Invocation", type: :integration do
 
         description "Greet a user by name"
         expects :name, type: String
-        expects :server_context, on: :ambient_context, type: Object, optional: true
+        expects :user_id, on: :ambient_context, type: Object, optional: true # spread from server_context
         exposes :greeting, type: String
 
         def call
-          expose greeting: "Hello, #{name}! (user #{server_context&.dig(:user_id).inspect})"
+          expose greeting: "Hello, #{name}! (user #{user_id.inspect})"
         end
       end
     end
@@ -45,7 +45,7 @@ RSpec.describe "Direct Axn Invocation", type: :integration do
         result = greet_axn.call(name: "Carol")
 
         expect(result).to be_ok
-        # The interpolated "(user nil)" proves server_context&.dig(:user_id) resolved to nil:
+        # The interpolated "(user nil)" proves the ambient user_id resolved to nil:
         # the direct-call path picks up no ambient Current state.
         expect(result.greeting).to eq("Hello, Carol! (user nil)")
       end
@@ -203,7 +203,6 @@ RSpec.describe "Direct Axn Invocation", type: :integration do
         def self.name = "DoubleValuePlainly"
 
         expects :value, type: Integer
-        expects :server_context, on: :ambient_context, type: Object, optional: true
         exposes :doubled, type: Integer
 
         def call
@@ -226,17 +225,17 @@ RSpec.describe "Direct Axn Invocation", type: :integration do
       expect(response.structured_content).to eq({ "doubled" => 42 })
     end
 
-    it "routes server_context: into the wrapped Axn's ambient_context" do
+    it "spreads server_context: into the wrapped Axn's ambient_context (declared fields resolve from it)" do
       context_axn = Class.new do
         include Axn
 
         def self.name = "EchoContextPlainly"
 
-        expects :server_context, on: :ambient_context, type: Object, optional: true
+        expects :user_id, on: :ambient_context, type: Object, optional: true # spread from server_context
         exposes :seen_user, type: Integer
 
         def call
-          expose seen_user: server_context&.dig(:user_id)
+          expose seen_user: user_id
         end
       end
 
@@ -256,7 +255,7 @@ RSpec.describe "Direct Axn Invocation", type: :integration do
         def self.name = "DoubleValuePlainly"
 
         expects :value, type: Integer
-        expects :server_context, on: :ambient_context, type: Object, optional: true
+        expects :user_id, on: :ambient_context, type: Object, optional: true # spread from server_context; excluded from inputSchema
         exposes :doubled, type: Integer
 
         def call
@@ -281,7 +280,7 @@ RSpec.describe "Direct Axn Invocation", type: :integration do
       tool_description = response[:result][:tools].first
       expect(tool_description[:name]).to eq("double_value_plainly")
       expect(tool_description[:inputSchema][:properties]).to have_key(:value)
-      expect(tool_description[:inputSchema][:properties]).not_to have_key(:server_context)
+      expect(tool_description[:inputSchema][:properties]).not_to have_key(:user_id) # ambient fields excluded
     end
 
     it "round-trips a tools/call, proving the original plain Axn is exposed over real MCP transport" do

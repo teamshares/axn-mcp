@@ -47,12 +47,21 @@ reflection rather than gem code.
   a nullable `type`); a `Numeric` field's output type is omitted (it admits `Complex`); and a
   `shape:` block on an `Array` field with no `of:` is no longer reflected in the *output* schema
   (combine `shape:` with `of:` for typed output items — input schema is unaffected).
-- **`server_context` is routed through axn core's `ambient_context`** (`expects :server_context, on:
-  :ambient_context, type: Object`) — excluded from `inputSchema`, and an explicit `server_context:`
-  fully replaces any process-wide `Current`-derived context (no server-side state leaks into an MCP
-  call). Read it with `&.dig(...)`: its runtime class varies (a plain `Hash` resolves to an
-  `ActiveSupport::HashWithIndifferentAccess`; a real `MCP::Server` round-trip passes an
-  `MCP::ServerContext`), so don't assert a specific class.
+- **`server_context` is spread into the Axn's `ambient_context`.** `Axn::MCP.wrap` passes the
+  injected `server_context` *as* the Axn's `ambient_context` (not nested under a `server_context`
+  key), so a tool declares the data it needs directly and generically — `expects :user_id, on:
+  :ambient_context` — and stays adapter-agnostic: the *same* class resolves `user_id` from the MCP
+  server context, from `Current` on a direct call, or from `Axn::RubyLLM.wrap`, with no MCP-specific
+  intermediate. axn extracts each declared field via `#[]`/`#dig`, so it works for a `Hash` or an
+  `MCP::ServerContext` object. `on: :ambient_context` fields are excluded from `inputSchema`, and the
+  explicit ambient context replaces any process-wide `Current`-derived default (no server-side
+  leakage; `nil` on a direct call with none provided).
+- **Added `Axn::MCP.server_context`** — the MCP-specific handle for transport *capabilities*
+  (`Axn::MCP.server_context.report_progress(...)`, `.cancelled?`), the live `MCP::ServerContext`
+  object that doesn't survive `ambient_context`'s declared-key filtering. `nil` outside a wrapped
+  tool call. Scoped via `ActiveSupport::IsolatedExecutionState` (thread/fiber per the configured
+  isolation level), matching how axn scopes its own per-execution state. Data belongs in
+  `ambient_context`; only transport capabilities need this.
 - **MCP error responses carry the Axn's own `result.error`** (axn's `"Something went wrong"` for a
   bare `fail!` / validation error / unhandled exception, or the explicit `fail!` reason). Declare a
   per-tool base `error "…"` for a friendlier generic message.

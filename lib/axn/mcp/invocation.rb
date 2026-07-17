@@ -2,11 +2,18 @@
 
 module Axn
   module MCP
-    # Shared "server_context: -> ambient_context: -> call -> MCP::Tool::Response" path used by both
-    # Axn::MCP::Tool#call (the with-server_context branch, back-compat dual-mode) and
-    # Axn::MCP.wrap-generated classes (PRO-2844). An explicit ambient_context: kwarg replaces axn
-    # core's default Current-attributes-derived ambient_context (see Axn::Core::AmbientContext) --
-    # passing it here even when server_context is nil is what stops server-side Current leaking in.
+    # Shared "server_context: -> ambient_context: -> call -> MCP::Tool::Response" path used by
+    # Axn::MCP.wrap-generated classes (PRO-2844). The injected server_context is passed *as* the
+    # Axn's ambient_context (spread, not nested under a `server_context` key), so a wrapped Axn
+    # declares the data it needs generically -- `expects :user_id, on: :ambient_context` -- and stays
+    # adapter-agnostic (the same class works under axn-ruby_llm, or a direct call resolving from
+    # Current). Passing an explicit ambient_context: (even the empty {} when server_context is nil)
+    # is what replaces axn core's default Current-attributes-derived ambient_context, stopping
+    # server-side Current state from leaking into an MCP call.
+    #
+    # The raw server_context object -- carrying MCP transport *capabilities* (#report_progress,
+    # #cancelled?), which are not ambient data and don't survive ambient_context's declared-key
+    # filtering -- is exposed separately via Axn::MCP.server_context for the duration of the call.
     module Invocation
       module_function
 
@@ -28,7 +35,9 @@ module Axn
         # (last-write-wins on the collision), so `.except` with Symbol keys alone doesn't catch it.
         rest = kwargs.reject { |k, _| %w[server_context ambient_context].include?(k.to_s) }
 
-        result = axn_class.call(ambient_context: { server_context: }, **rest)
+        result = Axn::MCP.with_server_context(server_context) do
+          axn_class.call(ambient_context: server_context || {}, **rest)
+        end
         Serializer.result_to_mcp_response(result, axn_class.external_field_configs, text_content:)
       end
     end

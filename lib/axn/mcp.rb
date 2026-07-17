@@ -4,6 +4,7 @@ require "date"
 require "axn"
 require "mcp"
 require "active_support/deprecation"
+require "active_support/isolated_execution_state"
 
 require_relative "mcp/version"
 Axn.extension_config.register_semantic_hint(:open_world, :closed_world)
@@ -41,6 +42,31 @@ module Axn
     # (silence in test, raise in CI, etc.) the same way it already does for its own deprecations.
     def self.deprecator
       @deprecator ||= ActiveSupport::Deprecation.new("1.0", "axn-mcp")
+    end
+
+    # The live MCP server context for the current wrapped-tool call -- an `MCP::ServerContext` over a
+    # real `MCP::Server`, or whatever raw value was passed as `server_context:` to a direct call --
+    # or `nil` outside a wrapped `#call`. This is the MCP-specific handle for transport *capabilities*
+    # (`Axn::MCP.server_context.report_progress(...)`, `.cancelled?`), which are not ambient data and
+    # don't survive `ambient_context`'s declared-key filtering. Ambient *data* still belongs in
+    # `ambient_context` (`expects :user_id, on: :ambient_context`), which `wrap` spreads from the same
+    # server_context and which stays adapter-agnostic. A tool reaching for this is knowingly
+    # MCP-coupled -- appropriate, since these operations are MCP-transport-only.
+    def self.server_context
+      ActiveSupport::IsolatedExecutionState[:__axn_mcp_server_context]
+    end
+
+    # Sets Axn::MCP.server_context for the duration of the block. Uses ActiveSupport's
+    # IsolatedExecutionState (thread- or fiber-scoped per the configured isolation_level), matching
+    # how axn core scopes its own per-execution state and CurrentAttributes -- so this stays correct
+    # under a Fiber scheduler rather than silently leaking across fibers a raw Thread-local would.
+    # Restores the previous value on the way out so nested wrapped calls compose.
+    def self.with_server_context(value)
+      previous = ActiveSupport::IsolatedExecutionState[:__axn_mcp_server_context]
+      ActiveSupport::IsolatedExecutionState[:__axn_mcp_server_context] = value
+      yield
+    ensure
+      ActiveSupport::IsolatedExecutionState[:__axn_mcp_server_context] = previous
     end
   end
 end

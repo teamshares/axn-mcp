@@ -190,7 +190,7 @@ MCP::Server.new(
 ```
 
 `server_context` flows identically to both: native tools read it in `call(args, server_context:)`;
-wrapped Axns get it routed into `ambient_context` (see [Server Context](#server-context)).
+wrapped Axns get it spread into `ambient_context` (see [Server Context](#server-context)).
 
 ## Field declarations & schema
 
@@ -235,7 +235,7 @@ expects :starts_on, coerce: Date                          # "2026-01-15" -> a Da
 expects :count,     type: { klass: Integer, coerce: true } # "42" -> 42
 ```
 
-Coercion applies to inbound `expects` fields — top-level **and** subfields declared with `on:` (including ambient subfields, e.g. `server_context` values). It is **not** available on `exposes` (outbound values are serialized, not coerced) or on `shape:` block members (a shape member only constrains its parent's structure and has no reader of its own for a coerced value to resolve onto — coercion is a read-path transform) — both *raise at class-definition* if given `coerce:`. Only a non-blank `String` is converted. An unparseable string doesn't silently fall through to a generic type-mismatch: coercion raises `Axn::InboundValidationError` carrying a specific `"<field> could not be coerced to a <Type>"` message — but, like any validation failure, that detail rides on the exception (logs / `on_exception`), while the tool's response to the client carries axn's user-facing `result.error` (`"Something went wrong"` by default, or the tool's own base `error "…"` — see [Error Handling](#error-handling)). `inputSchema`/`outputSchema` output is identical with or without `coerce:` — only accepted inbound values change, not the field's advertised JSON type.
+Coercion applies to inbound `expects` fields — top-level **and** subfields declared with `on:` (including ambient ones, e.g. a value spread from the MCP server context). It is **not** available on `exposes` (outbound values are serialized, not coerced) or on `shape:` block members (a shape member only constrains its parent's structure and has no reader of its own for a coerced value to resolve onto — coercion is a read-path transform) — both *raise at class-definition* if given `coerce:`. Only a non-blank `String` is converted. An unparseable string doesn't silently fall through to a generic type-mismatch: coercion raises `Axn::InboundValidationError` carrying a specific `"<field> could not be coerced to a <Type>"` message — but, like any validation failure, that detail rides on the exception (logs / `on_exception`), while the tool's response to the client carries axn's user-facing `result.error` (`"Something went wrong"` by default, or the tool's own base `error "…"` — see [Error Handling](#error-handling)). `inputSchema`/`outputSchema` output is identical with or without `coerce:` — only accepted inbound values change, not the field's advertised JSON type.
 
 
 ### Typed member contracts with `shape:`
@@ -488,9 +488,11 @@ end
 
 ## Server Context
 
-A tool that needs server-injected data declares the `server_context` ambient field, then declares
-each value it needs as a **subfield** of it (`on: :server_context`) — so it reads them like any other
-input (no manual digging), and they stay out of `inputSchema`:
+Server-injected **data** and server-side **capabilities** are two different things, reached two different ways.
+
+### Data — declare it on `ambient_context`
+
+A tool declares each value it needs directly on `ambient_context`, and reads it like any other input:
 
 ```ruby
 class AuthenticatedAction
@@ -498,33 +500,32 @@ class AuthenticatedAction
 
   description "Do something with the current user"
 
-  expects :server_context, on: :ambient_context, type: Object, optional: true
-  expects :user, on: :server_context, optional: true    # the value you actually need
+  expects :user_id, on: :ambient_context, type: Object, optional: true
 
   def call
-    current_user = user   # resolved from server_context; nil when called without one
+    current_user = User.find(user_id) if user_id
     # ...
   end
 end
 ```
 
-`Axn::MCP.wrap` plumbs the `server_context:` kwarg passed to `.call` into `ambient_context:` before
-invoking the wrapped Axn — it doesn't inject anything the class didn't ask for. Declaring the field
-`on: :ambient_context` is also what keeps it **out of `inputSchema`** (any `on: :ambient_context`
-field is excluded automatically, not via a hand-rolled list), and what guarantees an explicit
-`server_context:` replaces any process-wide ambient context for that call, so server-side state
-can't leak into an MCP invocation. `server_context` (and any subfield of it, like `user`) is `nil`
-when the Axn is called directly rather than through the MCP server.
+`Axn::MCP.wrap` passes the `server_context:` given to `.call` **as** the Axn's `ambient_context` (spread, not nested under a `server_context` key), and axn extracts each declared field from it via `#[]`/`#dig` — working whether the value is a plain `Hash` (direct/test calls) or an `MCP::ServerContext` object (a real-server round-trip). This is deliberately generic: the *same* Axn resolves `user_id` from the MCP server context here, from `ActiveSupport::CurrentAttributes` on a direct call, and from whatever `Axn::RubyLLM.wrap` provides — no MCP-specific `server_context` intermediate to declare, so the class stays reusable across adapters (the whole point of `ambient_context`).
 
-`type: Object` (not `Hash`) is deliberate: `server_context`'s actual class depends on how the tool was invoked and which `mcp` gem version is in use. A direct/test-style call (`Tool.call(server_context: {user_id: 1})`) passes whatever raw value you gave it through, which axn's `ambient_context` resolution wraps in an `ActiveSupport::HashWithIndifferentAccess` if it's a plain `Hash` — `#[]`/`#dig`/`is_a?(Hash)` all work regardless of symbol- or string-keyed access; `instance_of?(Hash)`/`#==` against a literal symbol-keyed `Hash` do not. A real `MCP::Server` round-trip (recent `mcp` gem versions) instead passes an `MCP::ServerContext` object, which is not Hash-like at all but transparently delegates arbitrary method calls — including `#dig`/`#[]` — to whatever context object the server was configured with (`MCP::Server.new(server_context: ...)`) via `method_missing`. Reading with `&.dig(...)`/`&.[]` (rather than asserting a specific class) works uniformly across both cases.
+`on: :ambient_context` fields are excluded from `inputSchema` automatically (not via a hand-rolled list), and the explicit ambient context `wrap` passes **replaces** any process-wide `Current`-derived default for that call — so no server-side state leaks into an MCP invocation, and the field is `nil` when the Axn is called directly with none provided.
 
-`Axn::MCP.wrap` routes the value in as `ambient_context: { server_context: <value> }` — a *single* ambient field, not spread into top-level ambient fields (so `expects :user_id, on: :ambient_context` wouldn't see it; declare `on: :server_context`). You don't reach into it by hand, though: declaring the values you need as subfields (`expects :user, on: :server_context`) lets axn extract them via `#[]`/`#dig`, which works whether `<value>` is a `Hash` (direct/test calls) or an `MCP::ServerContext` object (a real-server round-trip). `server_context&.dig(...)` still works for ad-hoc/dynamic access, but declared subfields are cleaner and are excluded from `inputSchema` automatically, same as the parent.
+### Capabilities — `Axn::MCP.server_context`
 
-### `MCP::ServerContext`'s richer capabilities
+Over a real `MCP::Server`, the context also offers session-scoped operations that talk back to the client — `report_progress`, `cancelled?`, etc. Those are transport **capabilities**, not data: they live on the `MCP::ServerContext` object itself and don't survive `ambient_context`'s declared-key filtering. Reach the live object with **`Axn::MCP.server_context`** (an MCP-specific handle; `nil` outside a wrapped tool call):
 
-When invoked through a real `MCP::Server`, `server_context` (an `MCP::ServerContext`) offers more than `#dig`/`#[]` — session-scoped operations that talk back to the calling client, e.g. `server_context.report_progress(50, total: 100, message: "Halfway done")` or `server_context.cancelled?` inside a long-running `#call`. These work today with no changes needed on this gem's side — `server_context` is just handed through untouched. They're **not available** on a direct/test-style call, where `server_context` is a plain `Hash`/`nil` with no such methods.
+```ruby
+def call
+  Axn::MCP.server_context&.report_progress(50, total: 100, message: "Halfway done")
+  fail!("cancelled") if Axn::MCP.server_context&.cancelled?
+  # ...
+end
+```
 
-The exact method set is entirely the `mcp` gem's own surface and evolves with it (check `MCP::ServerContext`'s own source for your installed version) — some methods there are themselves marked deprecated by the SDK independent of anything in this gem. Consult it directly rather than treating any list here as authoritative.
+A tool using this is knowingly MCP-coupled — appropriate, since these operations are MCP-transport-only (there's no equivalent on a direct call, where `Axn::MCP.server_context` returns the raw value passed as `server_context:`, or `nil`). The exact method set is the `mcp` gem's own surface and evolves with it (check `MCP::ServerContext`'s source for your installed version — some methods there are themselves SDK-deprecated); consult it directly rather than treating any list here as authoritative.
 
 ## Error Handling
 

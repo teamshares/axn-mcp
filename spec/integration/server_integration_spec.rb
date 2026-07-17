@@ -87,11 +87,11 @@ RSpec.describe "MCP Server Integration", type: :integration do
         end
 
         description "Return server context info"
-        expects :server_context, on: :ambient_context, type: Object, optional: true
-        exposes :user_id, type: Integer
+        expects :user_id, on: :ambient_context, type: Object, optional: true # spread from server_context
+        exposes :seen_user_id, type: Integer, optional: true
 
         def call
-          expose user_id: server_context&.dig(:user_id)
+          expose seen_user_id: user_id
         end
       end
     end
@@ -103,7 +103,7 @@ RSpec.describe "MCP Server Integration", type: :integration do
       response = parse_response(server.handle_json(request))
 
       result = response[:result]
-      expect(result[:structuredContent]).to eq({ user_id: 42 })
+      expect(result[:structuredContent]).to eq({ seen_user_id: 42 })
     end
   end
 
