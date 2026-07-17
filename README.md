@@ -488,8 +488,9 @@ end
 
 ## Server Context
 
-A tool that needs server-injected data declares a `server_context` field routed through axn core's
-`ambient_context`, and reads it with safe navigation:
+A tool that needs server-injected data declares the `server_context` ambient field, then declares
+each value it needs as a **subfield** of it (`on: :server_context`) — so it reads them like any other
+input (no manual digging), and they stay out of `inputSchema`:
 
 ```ruby
 class AuthenticatedAction
@@ -498,9 +499,10 @@ class AuthenticatedAction
   description "Do something with the current user"
 
   expects :server_context, on: :ambient_context, type: Object, optional: true
+  expects :user, on: :server_context, optional: true    # the value you actually need
 
   def call
-    current_user = server_context&.dig(:user)
+    current_user = user   # resolved from server_context; nil when called without one
     # ...
   end
 end
@@ -511,12 +513,12 @@ invoking the wrapped Axn — it doesn't inject anything the class didn't ask for
 `on: :ambient_context` is also what keeps it **out of `inputSchema`** (any `on: :ambient_context`
 field is excluded automatically, not via a hand-rolled list), and what guarantees an explicit
 `server_context:` replaces any process-wide ambient context for that call, so server-side state
-can't leak into an MCP invocation. `server_context` is `nil` when the Axn is called directly rather
-than through the MCP server (hence the `&.dig`).
+can't leak into an MCP invocation. `server_context` (and any subfield of it, like `user`) is `nil`
+when the Axn is called directly rather than through the MCP server.
 
 `type: Object` (not `Hash`) is deliberate: `server_context`'s actual class depends on how the tool was invoked and which `mcp` gem version is in use. A direct/test-style call (`Tool.call(server_context: {user_id: 1})`) passes whatever raw value you gave it through, which axn's `ambient_context` resolution wraps in an `ActiveSupport::HashWithIndifferentAccess` if it's a plain `Hash` — `#[]`/`#dig`/`is_a?(Hash)` all work regardless of symbol- or string-keyed access; `instance_of?(Hash)`/`#==` against a literal symbol-keyed `Hash` do not. A real `MCP::Server` round-trip (recent `mcp` gem versions) instead passes an `MCP::ServerContext` object, which is not Hash-like at all but transparently delegates arbitrary method calls — including `#dig`/`#[]` — to whatever context object the server was configured with (`MCP::Server.new(server_context: ...)`) via `method_missing`. Reading with `&.dig(...)`/`&.[]` (rather than asserting a specific class) works uniformly across both cases.
 
-This is also why the injected value lands as a *single* `server_context` ambient field you dig into, rather than each server-provided value being spread into its own ambient field (`expects :user_id, on: :ambient_context`). `Axn::MCP.wrap` routes the value in as `ambient_context: { server_context: <value> }` — and since `<value>` is often an `MCP::ServerContext` object, not a `Hash` whose keys could be spread, the opaque-blob-plus-`dig` shape is what works across both invocation paths. Declare the one `server_context` ambient field and read individual values from it.
+`Axn::MCP.wrap` routes the value in as `ambient_context: { server_context: <value> }` — a *single* ambient field, not spread into top-level ambient fields (so `expects :user_id, on: :ambient_context` wouldn't see it; declare `on: :server_context`). You don't reach into it by hand, though: declaring the values you need as subfields (`expects :user, on: :server_context`) lets axn extract them via `#[]`/`#dig`, which works whether `<value>` is a `Hash` (direct/test calls) or an `MCP::ServerContext` object (a real-server round-trip). `server_context&.dig(...)` still works for ad-hoc/dynamic access, but declared subfields are cleaner and are excluded from `inputSchema` automatically, same as the parent.
 
 ### `MCP::ServerContext`'s richer capabilities
 
