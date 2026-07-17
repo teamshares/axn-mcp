@@ -235,7 +235,7 @@ expects :starts_on, coerce: Date                          # "2026-01-15" -> a Da
 expects :count,     type: { klass: Integer, coerce: true } # "42" -> 42
 ```
 
-Coercion only affects top-level `expects` fields (not `exposes`, subfields, or `shape:` members), and only converts a non-blank `String` input. An unparseable string doesn't silently pass through to a generic type-mismatch error — it fails validation with a dedicated message: `"<field> could not be coerced to a <Type>"`. `inputSchema`/`outputSchema` output is identical with or without `coerce:` — only accepted inbound values change, not the field's advertised JSON type.
+Coercion applies to inbound `expects` fields — top-level **and** subfields declared with `on:` (including ambient subfields, e.g. `server_context` values). It is **not** available on `exposes` (outbound values are serialized, not coerced) or on `shape:` block members — both *raise at class-definition* if given `coerce:`. Only a non-blank `String` is converted. An unparseable string doesn't silently fall through to a generic type-mismatch: coercion raises `Axn::InboundValidationError` carrying a specific `"<field> could not be coerced to a <Type>"` message — but, like any validation failure, that detail rides on the exception (logs / `on_exception`), while the tool's response to the client carries axn's user-facing `result.error` (`"Something went wrong"` by default, or the tool's own base `error "…"` — see [Error Handling](#error-handling)). `inputSchema`/`outputSchema` output is identical with or without `coerce:` — only accepted inbound values change, not the field's advertised JSON type.
 
 
 ### Typed member contracts with `shape:`
