@@ -135,9 +135,19 @@ Per-tool customization comes from each class's own declarations (`tool name:`, `
 `semantic_hints`, `configure(:mcp)`), all honored inside `wrap`. It's symmetric with the same
 pattern in sibling adapter gems (e.g. `Axn::RubyLLM.tools`).
 
-A class becomes a `:mcp` member via any of: `tool :mcp` (or bare `tool`, meaning every registered
-adapter); a `configure(:mcp) { ... }` block; or living under a configured `Axn.config.tool_paths`
-directory. For a curated subset instead of all of them, filter the registry yourself:
+A class becomes a `:mcp` member via any of:
+
+- **`tool :mcp`** (or bare `tool`, meaning every registered adapter) — the explicit opt-in
+- an implicit **`configure(:mcp) { ... }`** block on the class (declaring MCP config implies membership)
+- **residency under a configured `Axn.config.tool_paths` directory** — set `Axn.config.tool_paths = ["app/actions/tools"]` (relative to `Rails.root/app`, or absolute); every Axn under it is auto-registered without an explicit `tool` declaration. Opt one out with `tool false`.
+
+**The class must be loaded for `Axn::MCP.tools` to see it** — the registry only enumerates
+currently-defined classes. `tool_paths` directories are eager-loaded on demand (and by Rails
+eager-loading); a `tool :mcp` class that lives *outside* a `tool_path` and isn't otherwise required
+won't appear until its file is loaded. Enumerate from `config.after_initialize` / a `to_prepare`
+block (not a `config/initializers` file) for reliable results under Rails.
+
+For a curated subset instead of all of them, filter the registry yourself:
 `Axn.tools_for(:mcp).select { ... }.map { |a| Axn::MCP.wrap(a) }`.
 
 ### One-off inline tools
@@ -252,7 +262,7 @@ end
 }
 ```
 
-(`optional:`/nullable fields reflect as a `type` array, not a bare type.)
+Requiredness and nullability are two orthogonal JSON Schema signals, not a redundancy: a member's *requiredness* is tracked solely by the `required` array (`region` is listed, so it's required); an *optional* member is omitted from `required` **and** additionally reflects a nullable `type` array (`["integer", "null"]`) — because an omittable field may resolve to null. So a required member shows up in `required` with a bare type, while an optional one is absent from `required` with a nullable type; that's why the `of:`/`shape:` examples below show `status` (required) in `required` but `active` (optional) as `["boolean", "null"]`.
 
 **`Data.define` struct:**
 
@@ -506,6 +516,8 @@ than through the MCP server (hence the `&.dig`).
 
 `type: Object` (not `Hash`) is deliberate: `server_context`'s actual class depends on how the tool was invoked and which `mcp` gem version is in use. A direct/test-style call (`Tool.call(server_context: {user_id: 1})`) passes whatever raw value you gave it through, which axn's `ambient_context` resolution wraps in an `ActiveSupport::HashWithIndifferentAccess` if it's a plain `Hash` — `#[]`/`#dig`/`is_a?(Hash)` all work regardless of symbol- or string-keyed access; `instance_of?(Hash)`/`#==` against a literal symbol-keyed `Hash` do not. A real `MCP::Server` round-trip (recent `mcp` gem versions) instead passes an `MCP::ServerContext` object, which is not Hash-like at all but transparently delegates arbitrary method calls — including `#dig`/`#[]` — to whatever context object the server was configured with (`MCP::Server.new(server_context: ...)`) via `method_missing`. Reading with `&.dig(...)`/`&.[]` (rather than asserting a specific class) works uniformly across both cases.
 
+This is also why the injected value lands as a *single* `server_context` ambient field you dig into, rather than each server-provided value being spread into its own ambient field (`expects :user_id, on: :ambient_context`). `Axn::MCP.wrap` routes the value in as `ambient_context: { server_context: <value> }` — and since `<value>` is often an `MCP::ServerContext` object, not a `Hash` whose keys could be spread, the opaque-blob-plus-`dig` shape is what works across both invocation paths. Declare the one `server_context` ambient field and read individual values from it.
+
 ### `MCP::ServerContext`'s richer capabilities
 
 When invoked through a real `MCP::Server`, `server_context` (an `MCP::ServerContext`) offers more than `#dig`/`#[]` — session-scoped operations that talk back to the calling client, e.g. `server_context.report_progress(50, total: 100, message: "Halfway done")` or `server_context.cancelled?` inside a long-running `#call`. These work today with no changes needed on this gem's side — `server_context` is just handed through untouched. They're **not available** on a direct/test-style call, where `server_context` is a plain `Hash`/`nil` with no such methods.
@@ -542,6 +554,8 @@ class ChargeCard
   # a bare fail! / validation error / exception now surfaces "Could not charge the card"
 end
 ```
+
+With a base `error` declared, an explicit `fail!("reason")` **combines** rather than replaces — by default the base prefixes the reason: `fail!("card declined")` → `"Could not charge the card: card declined"`. (A bare `fail!`, validation error, or exception still surfaces the base alone.) To emit a specific reason *without* the prefix, opt out per-call with `fail!("card declined", standalone: true)` → `"card declined"`. So the table above (reason shown verbatim) reflects a tool with **no** base `error`; add one and reasons are prefixed unless `standalone:`.
 
 Unhandled exceptions are also caught automatically. When an exception occurs:
 
