@@ -24,6 +24,16 @@ module Axn
 
     setting :present_as, default: :structured, one_of: %i[structured message], overridable: true
 
+    # Per-tool MCP metadata, declarable on the class via `configure(:mcp) { |c| c.title = "..." }`
+    # so it survives the zero-arg `Axn::MCP.tools` path (which calls `wrap` with no kwargs). Each
+    # defaults to nil -- left at `::MCP::Tool`'s own default unless set -- and an explicit `wrap`
+    # kwarg still wins over the configured value. Loosely typed (no validation here); `::MCP::Tool`
+    # validates the shapes when they're applied.
+    setting :title, default: nil, overridable: true
+    setting :icons, default: nil, overridable: true
+    setting :meta, default: nil, overridable: true
+    setting :annotations, default: nil, overridable: true
+
     # Shared deprecator for this gem's own deprecated API (e.g. the legacy annotation
     # bang-methods -- see lib/axn/mcp/tool.rb). A dedicated ActiveSupport::Deprecation instance,
     # not the old global ActiveSupport::Deprecation.warn, so a consuming Rails app can register it

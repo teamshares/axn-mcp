@@ -30,7 +30,11 @@ reflection rather than gem code.
 - `open_world` / `closed_world` registered as MCP-only `semantic_hints`. A class's `semantic_hints`
   (`:read_only` / `:idempotent` / `:destructive` / `:open_world` / `:closed_world`) drive its MCP
   annotations by default; an explicit `annotations:` on `wrap` always wins.
-- `title:` / `icons:` / `meta:` kwargs on `Axn::MCP.wrap` (mirroring `::MCP::Tool`'s own class methods).
+- Per-tool MCP metadata — `title` / `icons` / `meta` / `annotations` — settable either as
+  `Axn::MCP.wrap` kwargs or declaratively via `configure(:mcp) { |c| c.title = … }`. The
+  `configure(:mcp)` form survives the zero-arg `Axn::MCP.tools` path (which calls `wrap` with no
+  kwargs); an explicit `wrap` kwarg wins over it. For `annotations`, precedence is `wrap` kwarg →
+  `configure(:mcp)` → `semantic_hints`-derived.
 
 ### Changed
 

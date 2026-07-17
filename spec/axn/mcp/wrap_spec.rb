@@ -49,6 +49,40 @@ RSpec.describe "Axn::MCP.wrap" do
     expect(tool.annotations_value.read_only_hint).to be true
   end
 
+  describe "per-tool MCP metadata declarable via configure(:mcp) (survives the zero-arg Axn::MCP.tools path)" do
+    let(:configured_axn) do
+      Class.new do
+        include Axn
+
+        def self.name = "ConfiguredMetadataAxn"
+        exposes :x, type: String
+        def call = expose(x: "y")
+
+        configure(:mcp) do |c|
+          c.title = "Configured Title"
+          c.icons = [{ src: "https://example.com/i.png" }]
+          c.meta = { version: "9" }
+          c.annotations = { read_only_hint: true }
+        end
+      end
+    end
+
+    it "applies title/icons/meta/annotations from configure(:mcp) at wrap time (no wrap kwargs needed)" do
+      tool = Axn::MCP.wrap(configured_axn)
+
+      expect(tool.title).to eq("Configured Title")
+      expect(tool.icons).to eq([{ src: "https://example.com/i.png" }])
+      expect(tool.meta).to eq({ version: "9" })
+      expect(tool.annotations_value.read_only_hint).to be true
+    end
+
+    it "lets an explicit wrap kwarg win over the configure(:mcp) value" do
+      tool = Axn::MCP.wrap(configured_axn, title: "Override Title")
+
+      expect(tool.title).to eq("Override Title")
+    end
+  end
+
   describe "annotations derived from the wrapped Axn's semantic_hints" do
     def wrap_with_hints(*hints, **wrap_opts)
       axn = Class.new do

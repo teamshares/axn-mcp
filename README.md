@@ -434,21 +434,27 @@ class FetchData
 end
 ```
 
-For anything `semantic_hints` doesn't cover (a custom `title:`, or an annotation with no corresponding hint), pass `annotations:` to `wrap` directly — an explicit `annotations:` wins over hint-derived defaults:
+For anything `semantic_hints` doesn't cover (a custom annotation `title`, or an annotation with no corresponding hint), set `annotations` directly — either as a `wrap` kwarg or via `configure(:mcp)` (the latter survives `Axn::MCP.tools`). Precedence: `wrap` kwarg → `configure(:mcp)` → the `semantic_hints`-derived default.
 
 ```ruby
-Axn::MCP.wrap(MyAxn, annotations: {
-  read_only_hint: true,
-  idempotent_hint: true,
-  title: "My Custom Tool",
-})
+# At wrap time:
+Axn::MCP.wrap(MyAxn, annotations: { read_only_hint: true, idempotent_hint: true, title: "My Custom Tool" })
+
+# Or declaratively (picked up by Axn::MCP.tools):
+class MyAxn
+  include Axn
+  tool :mcp
+  configure(:mcp) { |c| c.annotations = { read_only_hint: true, idempotent_hint: true, title: "My Custom Tool" } }
+  # …
+end
 ```
 
 ## Title, Icons, and Metadata
 
-`::MCP::Tool` supports `title`/`icons`/`meta` alongside `description`/`annotations`. Pass them as `wrap` kwargs — a wrapped Axn has no `::MCP::Tool` class body of its own to declare them in:
+`::MCP::Tool` supports `title`/`icons`/`meta` alongside `description`/`annotations`. Set them either as `wrap` kwargs, or declaratively on the Axn via `configure(:mcp)` — the latter survives the zero-arg `Axn::MCP.tools` path (which calls `wrap` with no kwargs), so it's how you attach this metadata to a registry-enumerated tool. An explicit `wrap` kwarg wins over the `configure(:mcp)` value; both are omitted (left at `::MCP::Tool`'s own defaults) unless set.
 
 ```ruby
+# At wrap time:
 Axn::MCP.wrap(
   SearchAxn,
   description: "Search for items",
@@ -456,9 +462,19 @@ Axn::MCP.wrap(
   icons: [{ src: "https://example.com/icon.png", mimeType: "image/png" }],
   meta: { version: "1.0" },
 )
-```
 
-All are omitted (left at `::MCP::Tool`'s own defaults) unless passed.
+# Or declaratively (picked up by Axn::MCP.tools):
+class SearchAxn
+  include Axn
+  tool :mcp
+  configure(:mcp) do |c|
+    c.title = "Item Search"
+    c.icons = [{ src: "https://example.com/icon.png", mimeType: "image/png" }]
+    c.meta = { version: "1.0" }
+  end
+  # …
+end
+```
 
 ## Server Context
 

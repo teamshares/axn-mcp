@@ -39,12 +39,21 @@ module Axn
         resolved_name = resolve_wrap_tool_name(axn_class, name)
         resolved_description = description || axn_class.description
 
+        # Each metadata kwarg falls back to the wrapped Axn's own `configure(:mcp)` value (via axn
+        # core's shadow-proof resolver), so it's carried through the zero-arg `Axn::MCP.tools` path
+        # too; an explicit `wrap` kwarg still wins. `annotations` also falls back further, to the
+        # `semantic_hints`-derived defaults -- precedence: kwarg > configure(:mcp) > semantic_hints.
+        resolved_title = title || Axn::MCP.resolve_override_for(axn_class, :title)
+        resolved_icons = icons || Axn::MCP.resolve_override_for(axn_class, :icons)
+        resolved_meta  = meta  || Axn::MCP.resolve_override_for(axn_class, :meta)
+        configured_annotations = annotations || Axn::MCP.resolve_override_for(axn_class, :annotations)
+
         Class.new(::MCP::Tool) do
           tool_name(resolved_name)
           description(resolved_description)
-          title(title) if title
-          icons(icons) if icons
-          meta(meta) if meta
+          title(resolved_title) if resolved_title
+          icons(resolved_icons) if resolved_icons
+          meta(resolved_meta) if resolved_meta
 
           # axn_class.input_schema/.output_schema are axn core's own public reflection surface
           # (Axn::Core::SchemaReflection) -- wiring to those directly, rather than reaching past
@@ -54,7 +63,8 @@ module Axn
           output_schema(axn_class.output_schema) unless axn_class.external_field_configs.empty?
 
           hint_annotations = Axn::MCP::Annotations.annotations_for(axn_class._semantic_hints)
-          self.annotations(**(annotations || hint_annotations)) if annotations || hint_annotations.any?
+          resolved_annotations = configured_annotations || (hint_annotations if hint_annotations.any?)
+          self.annotations(**resolved_annotations) if resolved_annotations
 
           define_singleton_method(:call) do |**kwargs|
             # Resolved fresh on every call, not captured once at wrap-time, so a gem-wide config
