@@ -23,9 +23,11 @@ Gem::Specification.new do |spec|
   gemspec = File.basename(__FILE__)
   spec.files = IO.popen(%w[git ls-files -z], chdir: __dir__, err: IO::NULL) do |ls|
     ls.readlines("\x0", chomp: true).reject do |f|
+      # internal-docs/ holds internal/superpowers drafts (plans, specs) — tracked in the repo but
+      # not shipped in the gem. docs/ is reserved for a future user-facing (VitePress) site.
       (f == gemspec) ||
-        f.start_with?(*%w[bin/ spec/ .git .github Gemfile Gemfile.lock .rspec_status pkg/ node_modules/ tmp/ .rspec .rubocop
-                          .tool-versions package.json])
+        f.start_with?(*%w[bin/ spec/ internal-docs/ .git .github Gemfile Gemfile.lock .rspec_status pkg/ node_modules/ tmp/ .rspec
+                          .rubocop .tool-versions package.json])
     end
   end
   spec.bindir = "exe"

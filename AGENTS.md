@@ -33,3 +33,6 @@ Schemas come from axn core reflection (`axn_class.input_schema`/`output_schema`)
 - `CHANGELOG.md` entry per user-visible change; bump `lib/axn/mcp/version.rb` per semver.
 - Update `README.md` when consumer-visible behavior changes (failure/success text shape, config
   surface, schema output, exposure API). Log retirements/removals in `DEPRECATIONS.md`.
+- Internal/superpowers notes (plans, specs, drafts) go in `internal-docs/` — tracked, but excluded
+  from the packaged gem (`spec.files` reject in the gemspec). `docs/` is reserved for a future
+  user-facing (VitePress) site; don't put internal notes there.
