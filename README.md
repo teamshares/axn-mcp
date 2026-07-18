@@ -294,7 +294,7 @@ Requiredness and nullability are two orthogonal JSON Schema signals, not a redun
 IntegrationRecord = Data.define(:source, :provider_name, :active, :status)
 
 exposes :integration, type: IntegrationRecord do
-  field :status, type: String, inclusion: { in: %w[connected error needs_reconnect] }
+  field :status, type: String, inclusion: %w[connected error needs_reconnect]
   field :active, type: :boolean, optional: true
 end
 ```
@@ -369,7 +369,7 @@ exposes :integrations, type: Array, of: IntegrationRecord
 
 ```ruby
 exposes :integrations, type: Array, of: IntegrationRecord do
-  field :status, type: String, inclusion: { in: %w[connected error needs_reconnect] }
+  field :status, type: String, inclusion: %w[connected error needs_reconnect]
   field :active, type: :boolean, optional: true
 end
 ```
@@ -432,7 +432,7 @@ resolve to a record).
 ### Enums via Inclusion
 
 ```ruby
-expects :status, inclusion: { in: %w[active inactive pending] }
+expects :status, inclusion: %w[active inactive pending]
 ```
 
 Generates:
