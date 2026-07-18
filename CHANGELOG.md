@@ -20,8 +20,18 @@ reflection rather than gem code.
   `tool :mcp`, a `configure(:mcp)` bag, or residency under a configured `tool_path`), each already
   wrapped and deterministically ordered by `tool_name`. `MCP::Server.new(tools: Axn::MCP.tools)`.
   Symmetric with `Axn::RubyLLM.tools`.
-- Registers `:mcp` as a tool adapter with axn core's process-global registry
-  (`Axn.register_tool_adapter(:mcp)`), backing `Axn.tools_for(:mcp)`.
+- Registers `:mcp` as a tool adapter with axn core's process-global registry, passing `Axn::MCP`
+  itself as the config source (`Axn.register_tool_adapter(:mcp, self)`) so the registry reads
+  `Axn::MCP.config.tool_roots` for directory-based tool membership. `Axn::MCP` `extend`s
+  `Axn::Tools::AdapterRoots` and ships a default `tool_roots` of `["agent_tools"]` — an Axn under
+  `app/agent_tools/` is exposed as an MCP tool with no `tool :mcp` declaration, and (since
+  `axn-ruby_llm` defaults to the same dir) over ruby_llm too. Roots are broad-path-validated
+  (`app`/`.`/`actions`/`..` rejected). Membership is `(directory grant ∪ tool declaration) − except`.
+- **Breaking (core, via the axn bump this release requires):** `tool :mcp` now **adds** the adapter
+  to the directory grant instead of replacing it (declare all adapters/`name:`/`except:`/per-adapter
+  bags in one `tool` call), and the global `Axn.config.tool_paths` is removed in favor of per-adapter
+  `<adapter>.config.tool_roots` (for MCP: `Axn::MCP.config.tool_roots`). Per-adapter tool config can
+  also be declared inline via `tool mcp: { … }` (sugar over `configure(:mcp)`; axn PRO-2942).
 - `present_as` (`:structured` | `:message`) — picks whether a tool's response text block is the
   serialized `exposes` or the Axn's success/error message. Settable gem-wide
   (`Axn::MCP.config.present_as`), per-class (`configure(:mcp) { |c| c.present_as = … }`), or on

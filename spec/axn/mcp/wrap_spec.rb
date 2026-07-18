@@ -186,6 +186,19 @@ RSpec.describe "Axn::MCP.wrap" do
       expect(Axn::MCP.wrap(plain_axn, description: "d").name_value).to eq(plain_axn.tool_name)
     end
 
+    it "honors a per-adapter `tool mcp: { name: }` override over the shared/derived name (PRO-2942)" do
+      named = Class.new do
+        include Axn
+
+        def self.name = "SomeVerboseClassName"
+        tool mcp: { name: "mcp_specific" }
+        exposes :x, type: String
+        def call = expose(x: "y")
+      end
+
+      expect(Axn::MCP.wrap(named, description: "d").name_value).to eq("mcp_specific")
+    end
+
     it "raises when neither name: nor a derivable axn_class.name is available" do
       truly_anonymous = Class.new do
         include Axn

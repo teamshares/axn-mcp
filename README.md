@@ -135,17 +135,41 @@ Per-tool customization comes from each class's own declarations (`tool name:`, `
 `semantic_hints`, `configure(:mcp)`), all honored inside `wrap`. It's symmetric with the same
 pattern in sibling adapter gems (e.g. `Axn::RubyLLM.tools`).
 
-A class becomes a `:mcp` member via any of:
+### Membership: directory roots + the `tool` DSL
 
-- **`tool :mcp`** (or bare `tool`, meaning every registered adapter) — the explicit opt-in
-- an implicit **`configure(:mcp) { ... }`** block on the class (declaring MCP config implies membership)
-- **residency under a configured `Axn.config.tool_paths` directory** — set `Axn.config.tool_paths = ["app/actions/tools"]` (relative to `Rails.root/app`, or absolute); every Axn under it is auto-registered without an explicit `tool` declaration. Opt one out with `tool false`.
+A class's `:mcp` membership is **`(directory-root grant ∪ tool declaration) − except`**:
+
+- **Directory roots** — every Axn whose file lives under one of this adapter's `tool_roots` is granted, no `tool` declaration needed. `Axn::MCP` ships a default root of **`agent_tools`** (i.e. `app/agent_tools/` in a Rails app), a dir shared with `axn-ruby_llm` — so a tool dropped there is exposed over both surfaces at once. Configure the roots with `Axn::MCP.config.tool_roots = ["agent_tools", "actions/mcp_tools"]` (relative to `Rails.root/app`, or absolute). Roots are validated: a broad entry (`app`, `.`, `actions`, a `..` traversal) is rejected, so you can't bulk-expose every business action.
+- **`tool :mcp`** — explicitly **adds** `:mcp` (on top of any directory grant), for a tool that lives *outside* the roots. Bare **`tool`** grants every registered adapter.
+- **`configure(:mcp) { … }`** — declaring MCP config implies `:mcp` membership.
+- **`tool except: :mcp`** — narrows: keeps the directory grant but removes `:mcp`. **`tool false`** opts out of every adapter.
+
+> **Union, not replacement:** `tool :mcp` **adds** to the directory grant rather than replacing it — a tool under a root *and* declaring `tool :ruby_llm` belongs to both. Declare all adapters/`except:`/per-adapter options in a single `tool` call (a second `tool` on the same class raises).
+
+```ruby
+# In app/agent_tools/ — no `tool` needed; granted to every adapter whose roots include agent_tools:
+class ListCompanies
+  include Axn
+  description "List companies"
+  # ...
+end
+
+# Anywhere else — opt in explicitly:
+class Ping
+  include Axn
+  tool :mcp
+  description "Ping"
+  # ...
+end
+
+MCP::Server.new(name: "my-server", version: "1.0.0", tools: Axn::MCP.tools)
+```
 
 **The class must be loaded for `Axn::MCP.tools` to see it** — the registry only enumerates
-currently-defined classes. `tool_paths` directories are eager-loaded on demand (and by Rails
-eager-loading); a `tool :mcp` class that lives *outside* a `tool_path` and isn't otherwise required
-won't appear until its file is loaded. Enumerate from `config.after_initialize` / a `to_prepare`
-block (not a `config/initializers` file) for reliable results under Rails.
+currently-defined classes. `tool_roots` directories are eager-loaded on demand (and by Rails
+eager-loading); a `tool :mcp` class that lives *outside* a root and isn't otherwise required won't
+appear until its file is loaded. Enumerate from `config.after_initialize` / a `to_prepare` block
+(not a `config/initializers` file) for reliable results under Rails.
 
 For a curated subset instead of all of them, filter the registry yourself:
 `Axn.tools_for(:mcp).select { ... }.map { |a| Axn::MCP.wrap(a) }`.

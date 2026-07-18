@@ -9,19 +9,23 @@ require "active_support/isolated_execution_state"
 require_relative "mcp/version"
 Axn.extension_config.register_semantic_hint(:open_world, :closed_world)
 
-# Register :mcp as a tool adapter with axn core's process-global registry (PRO-2923), so a
-# consumer can build its server tool list from `Axn.tools_for(:mcp)` -- resolving bare `tool`
-# membership, `tool :mcp`, and implicit `configure(:mcp)` membership -- instead of a
-# hand-maintained array.
-Axn.register_tool_adapter(:mcp)
-
 module Axn
   module MCP
     extend Axn::Configurable
+    extend Axn::Tools::AdapterRoots
 
     config_namespace :mcp
 
     class SchemaError < StandardError; end
+
+    # `extend Axn::Tools::AdapterRoots` declares a validated `tool_roots` directory list (default
+    # []); the registry reads `Axn::MCP.config.tool_roots` for directory-based tool membership.
+    # Ship the shared `agent_tools` convention as the default root, so an Axn under `app/agent_tools/`
+    # is exposed as an MCP tool out of the box (no explicit `tool :mcp` needed) -- and, since
+    # axn-ruby_llm defaults to the same dir, the same tool is exposed over ruby_llm too. Re-declaring
+    # the setting overrides AdapterRoots' empty default while reusing its broad-path validation
+    # (which rejects widening a root to `app/`/`.`/`actions`/a `..` traversal).
+    setting :tool_roots, default: %w[agent_tools], validate: ->(value) { Axn::Tools::AdapterRoots.validate!(value) }
 
     setting :present_as, default: :structured, one_of: %i[structured message], overridable: true
 
@@ -68,6 +72,13 @@ module Axn
     ensure
       ActiveSupport::IsolatedExecutionState[:__axn_mcp_server_context] = previous
     end
+
+    # Register :mcp with axn core's process-global tool registry, passing this module as the config
+    # source (PRO-2943/PRO-2944) so the registry reads `Axn::MCP.config.tool_roots` for
+    # directory-based membership. A consumer builds its server tool list from `Axn::MCP.tools`
+    # (`Axn.tools_for(:mcp)`) -- resolving directory-root grants, an explicit `tool`/`tool :mcp`
+    # declaration, and implicit `configure(:mcp)` membership -- instead of a hand-maintained array.
+    Axn.register_tool_adapter(:mcp, self)
   end
 end
 

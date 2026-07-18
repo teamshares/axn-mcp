@@ -15,7 +15,10 @@ Schemas come from axn core reflection (`axn_class.input_schema`/`output_schema`)
   (`lib/axn/mcp/tool.rb`) — never revive it as a base; it's slated for deletion at 1.0 (see
   `DEPRECATIONS.md`).
 - Config is `Axn::Configurable` (`lib/axn/mcp.rb`) — add a `setting`, not a hand-rolled class. Register
-  gem-level integrations with core at load: `register_semantic_hint`, `register_tool_adapter(:mcp)`.
+  gem-level integrations with core at load: `register_semantic_hint`, and
+  `register_tool_adapter(:mcp, self)` (pass `Axn::MCP` as the config source). `Axn::MCP` `extend`s
+  `Axn::Tools::AdapterRoots` and ships `tool_roots` default `["agent_tools"]`; membership is
+  `(directory-root grant ∪ tool declaration) − except`. There is no `Axn.config.tool_paths`.
 - Verify schema output against real `MCP::Tool::Response`/`InputSchema`/`OutputSchema` objects, not
   hand-built hashes (`spec/axn/mcp/tool_spec.rb`, `spec/axn/mcp/wrap_spec.rb`).
 - Pin exact user-facing failure/success strings with specs, not `be_present`/`ok?`. The gem imposes

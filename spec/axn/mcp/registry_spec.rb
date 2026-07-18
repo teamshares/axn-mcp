@@ -8,6 +8,25 @@ RSpec.describe "Axn::MCP tool-adapter registration" do
     expect(Axn::Tools::Registry.adapters).to include(:mcp)
   end
 
+  describe "tool_roots / adapter config source (PRO-2943/PRO-2944)" do
+    after { Axn::MCP.reset_config! }
+
+    it "ships `agent_tools` as the default tool_roots (shared with axn-ruby_llm)" do
+      expect(Axn::MCP.config.tool_roots).to eq(["agent_tools"])
+    end
+
+    it "registers Axn::MCP as the :mcp adapter's config source, so the registry reads its tool_roots" do
+      expect(Axn::Tools::Registry.adapter_config_source(:mcp)).to eq(Axn::MCP)
+
+      Axn::MCP.config.tool_roots = ["actions/mcp_tools"]
+      expect(Axn::Tools::Registry.adapter_config_source(:mcp).config.tool_roots).to eq(["actions/mcp_tools"])
+    end
+
+    it "rejects a broad tool_roots entry that would bulk-expose every business action" do
+      expect { Axn::MCP.config.tool_roots = ["app"] }.to raise_error(ArgumentError, /too broad/)
+    end
+  end
+
   it "lets a consumer enumerate :mcp tools via Axn.tools_for(:mcp)" do
     stub_const("EnumerableMcpTool", Class.new do
       include Axn

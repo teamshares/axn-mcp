@@ -107,9 +107,10 @@ module Axn
       end
 
       # Resolve the provider-facing tool name. An explicit `name:` kwarg (most local to the call
-      # site) wins; otherwise consume axn core's canonical `tool_name` (PRO-2923) -- which honors a
-      # `tool name: "..."` override on the wrapped Axn and its `tool_name_stripped_prefixes`, and
-      # snake_cases the class name -- replacing the old `::MCP::StringUtils.handle_from_class_name`.
+      # site) wins; otherwise consume axn core's canonical `tool_name(:mcp)` -- passing the adapter so
+      # a per-adapter `tool mcp: { name: "..." }` override wins (PRO-2942), then a shared `tool name:`,
+      # then `tool_name_stripped_prefixes` + snake_cased class name. Passing `:mcp` also matches the
+      # name `Axn.tools_for(:mcp)` sorts/dedupes by, so `.tools` and a direct `wrap` agree.
       #
       # Core's `tool_name` never returns blank: a truly anonymous, never-named class (no class name,
       # no `axn_name`) falls back to the generic "tool". That's a footgun for wrap's common inline
@@ -118,7 +119,7 @@ module Axn
       # silently shipping a tool named "tool"; require an explicit `name:` instead.
       def resolve_wrap_tool_name(axn_class, name)
         return name if name
-        return axn_class.tool_name if axn_class.name.present? || axn_class.axn_name.present?
+        return axn_class.tool_name(:mcp) if axn_class.name.present? || axn_class.axn_name.present?
 
         raise ArgumentError, "Axn::MCP.wrap requires name: when the wrapped Axn has no derivable class name (#{axn_class}.name is nil)"
       end
