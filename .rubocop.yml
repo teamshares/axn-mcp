@@ -1,94 +1,19 @@
-AllCops:
-  TargetRubyVersion: 3.2
-  NewCops: enable
-  SuggestExtensions: false
+inherit_gem:
+  axn: .rubocop.yml
 
-# Standard for hyphenated gem names
+# Local deltas only — the AllCops preamble (TargetRubyVersion/NewCops/SuggestExtensions) and the
+# shared Style/Metrics body (double_quotes, shorthand hash, trailing commas, disabled
+# Documentation/MultilineBlockChain/SingleLineMethods/DoubleNegation/etc., and the Metrics maxes)
+# come from axn's shared config above. We own both sides of that coupling: an axn cop change may
+# turn this gem's CI red, and we fix it on our own schedule.
+
+# Standard for hyphenated gem names — axn's shared config does not configure Naming/FileName.
 Naming/FileName:
   Exclude:
     - "lib/axn-mcp.rb"
 
-Style/MultilineBlockChain:
-  Enabled: false
-
-Style/SingleLineMethods:
-  Enabled: false
-
-Style/StringLiterals:
-  Enabled: true
-  EnforcedStyle: double_quotes
-
+# axn's shared config sets Style/StringLiterals (double_quotes) but not the interpolation variant;
+# keep this gem on double quotes inside interpolation too.
 Style/StringLiteralsInInterpolation:
   Enabled: true
   EnforcedStyle: double_quotes
-
-Style/Documentation:
-  Enabled: false
-
-Style/TrailingCommaInArguments:
-  EnforcedStyleForMultiline: comma
-
-Style/TrailingCommaInArrayLiteral:
-  EnforcedStyleForMultiline: comma
-
-Style/TrailingCommaInHashLiteral:
-  EnforcedStyleForMultiline: comma
-
-Style/HashSyntax:
-  EnforcedShorthandSyntax: always
-
-Naming/MemoizedInstanceVariableName:
-  Enabled: false
-
-Style/ClassAndModuleChildren:
-  Enabled: false
-
-Style/DoubleNegation:
-  Enabled: false
-
-Naming/MethodParameterName:
-  AllowedNames: e, on, id, if, as
-
-Metrics/BlockLength:
-  Max: 50
-  Exclude:
-    - 'spec/**/*'
-    - '*.gemspec'
-
-Metrics/ClassLength:
-  Max: 150
-
-# SchemaBuilder.json_type_for has complex type inference logic by design
-Metrics/MethodLength:
-  Max: 30
-  Exclude:
-    - "lib/axn/mcp/schema_builder.rb"
-
-Layout/LineLength:
-  Max: 160
-
-Naming/VariableNumber:
-  Exclude:
-    - 'spec/**/*'
-
-Metrics/PerceivedComplexity:
-  Max: 20
-  Exclude:
-    - "lib/axn/mcp/schema_builder.rb"
-
-Metrics/AbcSize:
-  Max: 32
-  Exclude:
-    - "lib/axn/mcp/schema_builder.rb"
-
-Metrics/CyclomaticComplexity:
-  Max: 20
-  Exclude:
-    - "lib/axn/mcp/schema_builder.rb"
-
-Metrics/ParameterLists:
-  Max: 10
-
-Metrics/ModuleLength:
-  Exclude:
-    - "lib/axn/mcp/schema_builder.rb"
