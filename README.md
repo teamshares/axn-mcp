@@ -678,13 +678,11 @@ Bug reports and pull requests are welcome on GitHub at [https://github.com/teams
 This gem wraps the excellent [MCP Ruby SDK](https://github.com/modelcontextprotocol/ruby-sdk) from the Model Context Protocol team.
 
 <!-- TEMPORARY: transitional upgrade guide — remove this section at 1.0 (tracked in DEPRECATIONS.md). -->
-## Migrating from the pre-release subclass API
+## Upgrading from 0.1.x
 
-`0.2.0` is the first published release. If you were on an earlier, unreleased build that used the
-`Axn::MCP::Tool` subclass base, the migration to the author-once API (a plain Axn exposed via
-`Axn::MCP.wrap` / `Axn::MCP.tools`) is mechanical — mostly one-liners:
+`0.2.0` re-architects the gem around author-once (a plain Axn exposed via `Axn::MCP.wrap` / `Axn::MCP.tools`) and retires the `Axn::MCP::Tool` subclass base. The migration is mechanical — mostly one-liners:
 
-| Pre-release (subclass API) | 0.2.0 |
+| 0.1.x | 0.2.0 |
 | --- | --- |
 | `class T < Axn::MCP::Tool` … `end` | a plain Axn (`class T; include Axn; … end`), then `Axn::MCP.wrap(T)` |
 | `Axn::MCP::Tool.define(description:, expects:, exposes:, …) { … }` | `Axn::MCP.wrap(Axn::Factory.build(expects:, exposes:) { … }, name: "…", description: "…")` |
@@ -696,7 +694,7 @@ This gem wraps the excellent [MCP Ruby SDK](https://github.com/modelcontextproto
 The most common case, before and after:
 
 ```ruby
-# Pre-release (subclass API)
+# 0.1.x
 class GreetUser < Axn::MCP::Tool
   description "Greet a user"
   expects :name, type: String

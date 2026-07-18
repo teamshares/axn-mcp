@@ -2,77 +2,141 @@
 
 ## 0.2.0
 
-First published release. `Axn::MCP` exposes plain [Axn](https://github.com/teamshares/axn) actions as
-[Model Context Protocol](https://modelcontextprotocol.io/) tools — author an action once and expose
-it over MCP (and, via sibling adapters like `axn-ruby_llm`, elsewhere) without rewriting it.
+Re-architected around **author-once**: write a plain Axn and expose it as an `::MCP::Tool` with
+`Axn::MCP.wrap` (one tool) or `Axn::MCP.tools` (every registered `:mcp` tool). The `Axn::MCP::Tool`
+subclass base is retired, and schema generation + value serialization now come from `axn` core
+reflection rather than gem code.
 
-### Exposing tools
+### Added
 
-- **`Axn::MCP.wrap(axn_class, description: nil, name: nil, title: nil, icons: nil, meta: nil, annotations: nil, present_as: nil)`**
-  turns any plain Axn (`include Axn`) into an `::MCP::Tool` subclass whose `.call` returns an
-  `MCP::Tool::Response`. The original Axn is untouched — a direct `.call` still returns an
-  `Axn::Result` — so the same class can be exposed to other adapters too. `description:` defaults to
-  the Axn's own `.description`; `name:` to axn core's `tool_name` (honoring a `tool name:` /
-  `tool mcp: { name: }` override and `tool_name_stripped_prefixes`). Raises if a truly anonymous Axn
-  is wrapped without `name:`.
-- **`Axn::MCP.tools`** — zero-arg; returns every Axn registered for the `:mcp` adapter, already
-  wrapped and deterministically ordered by tool name, for `MCP::Server.new(tools: Axn::MCP.tools)`.
+- `Axn::MCP.wrap(axn_class, description: nil, name: nil, title: nil, icons: nil, meta: nil, annotations: nil, present_as: nil)` —
+  expose any plain Axn (`include Axn`) as an `::MCP::Tool` subclass whose `.call` always returns an
+  `MCP::Tool::Response`. The original Axn is untouched (direct `.call` still returns `Axn::Result`).
+  `description:` defaults to the Axn's own `.description`; `name:` to axn core's canonical `tool_name`
+  (honors a `tool name:` override + `tool_name_stripped_prefixes`); annotations derive from the Axn's
+  `semantic_hints` unless an explicit `annotations:` is passed. Raises if a truly anonymous Axn (no
+  class name, no `axn_name`) is wrapped without `name:`.
+- `Axn::MCP.tools` — zero-arg convenience returning every Axn registered as a `:mcp` tool (via
+  `tool :mcp`, a `configure(:mcp)` bag, or residency under a configured `tool_path`), each already
+  wrapped and deterministically ordered by `tool_name`. `MCP::Server.new(tools: Axn::MCP.tools)`.
   Symmetric with `Axn::RubyLLM.tools`.
-- **Membership.** An Axn is a `:mcp` tool if its file lives under a configured `tool_roots` directory
-  (default `["agent_tools"]` — shared with `axn-ruby_llm`, so a tool dropped in `app/agent_tools/` is
-  exposed on both surfaces), or it declares `tool :mcp` / `tool mcp: { … }`, or it carries a
-  `configure(:mcp)` block. `tool` is additive; `tool false` / `tool except: :mcp` opt out — net
-  membership is `(directory grant ∪ declaration) − except`. `Axn::MCP.config.tool_roots` is
-  broad-path-validated (a root of `app`/`.`/`actions`/a `..` traversal is rejected). Per-adapter tool
-  config can be declared inline via `tool mcp: { … }`.
-- **One-off inline tools** — no bespoke factory; compose
-  `Axn::MCP.wrap(Axn::Factory.build(expects:, exposes:) { … }, name: "…")`.
-- Wrapped tools mix freely with hand-written `::MCP::Tool`s in the same `MCP::Server` `tools:` array.
+- Registers `:mcp` as a tool adapter with axn core's process-global registry, passing `Axn::MCP`
+  itself as the config source (`Axn.register_tool_adapter(:mcp, self)`) so the registry reads
+  `Axn::MCP.config.tool_roots` for directory-based tool membership. `Axn::MCP` `extend`s
+  `Axn::Tools::AdapterRoots` and ships a default `tool_roots` of `["agent_tools"]` — an Axn under
+  `app/agent_tools/` is exposed as an MCP tool with no `tool :mcp` declaration, and (since
+  `axn-ruby_llm` defaults to the same dir) over ruby_llm too. Roots are broad-path-validated
+  (`app`/`.`/`actions`/`..` rejected). Membership is `(directory grant ∪ tool declaration) − except`.
+- **Breaking (core, via the axn bump this release requires):** `tool :mcp` now **adds** the adapter
+  to the directory grant instead of replacing it (declare all adapters/`name:`/`except:`/per-adapter
+  bags in one `tool` call), and the global `Axn.config.tool_paths` is removed in favor of per-adapter
+  `<adapter>.config.tool_roots` (for MCP: `Axn::MCP.config.tool_roots`). Per-adapter tool config can
+  also be declared inline via `tool mcp: { … }` (sugar over `configure(:mcp)`; axn PRO-2942).
+- `present_as` (`:structured` | `:message`) — picks whether a tool's response text block is the
+  serialized `exposes` or the Axn's success/error message. Settable gem-wide
+  (`Axn::MCP.config.present_as`), per-class (`configure(:mcp) { |c| c.present_as = … }`), or on
+  `Axn::MCP.wrap(present_as:)` (most-local wins). `:structured` is the default; `structuredContent`
+  always carries the exposed data regardless.
+- `open_world` / `closed_world` registered as MCP-only `semantic_hints`. A class's `semantic_hints`
+  (`:read_only` / `:idempotent` / `:destructive` / `:open_world` / `:closed_world`) drive its MCP
+  annotations by default; an explicit `annotations:` on `wrap` always wins.
+- Per-tool MCP metadata — `title` / `icons` / `meta` / `annotations` — settable either as
+  `Axn::MCP.wrap` kwargs or declaratively via `configure(:mcp) { |c| c.title = … }`. The
+  `configure(:mcp)` form survives the zero-arg `Axn::MCP.tools` path (which calls `wrap` with no
+  kwargs); an explicit `wrap` kwarg wins over it. For `annotations`, precedence is `wrap` kwarg →
+  `configure(:mcp)` → `semantic_hints`-derived.
 
-### Schemas & serialization
+### Changed
 
-- `inputSchema` / `outputSchema` and exposed-value serialization come from axn core reflection
-  (`Axn::Reflection::Schema` / `Axn::Reflection::Values`) — covering `expects`/`exposes` types,
-  `inclusion:` enums, `model:` `_id` fields, `coerce:`, subfields, and `of:` / `shape:` typed array
-  elements. Nullable/optional fields reflect as a `type` array (`["string", "null"]`); a
-  conditionally-required field (`expects :token, if: :use_token`) reflects as an `allOf` clause so
-  `MCP::Server`'s pre-flight check doesn't wrongly reject a valid call. Reflection is best-effort and
-  deliberately biased stricter-than-runtime (see the README for the one documented looser case).
-- `on: :ambient_context` fields are excluded from `inputSchema`.
+- **Schemas and serialization come from `axn` core** (`Axn::Reflection::Schema` /
+  `Axn::Reflection::Values`), replacing the gem's own builder. Consumer-visible reflection
+  differences: nullable/optional fields reflect as a `type` array (`["string", "null"]`) rather than
+  a bare type; boolean fields gain `enum: [true]`/`[false]`; a `model:` field's generated `_id` no
+  longer asserts `type: "integer"` (a primary key's type isn't statically knowable) but forbids
+  `null` when required; every `exposes` field is listed in output `required` (optionality shows up as
+  a nullable `type`); a `Numeric` field's output type is omitted (it admits `Complex`); and a
+  `shape:` block on an `Array` field with no `of:` is no longer reflected in the *output* schema
+  (combine `shape:` with `of:` for typed output items — input schema is unaffected).
+- **`server_context` is spread into the Axn's `ambient_context`.** `Axn::MCP.wrap` passes the
+  injected `server_context` *as* the Axn's `ambient_context` (not nested under a `server_context`
+  key), so a tool declares the data it needs directly and generically — `expects :user_id, on:
+  :ambient_context` — and stays adapter-agnostic: the *same* class resolves `user_id` from the MCP
+  server context, from `Current` on a direct call, or from `Axn::RubyLLM.wrap`, with no MCP-specific
+  intermediate. axn extracts each declared field via `#[]`/`#dig`, so it works for a `Hash` or an
+  `MCP::ServerContext` object. `on: :ambient_context` fields are excluded from `inputSchema`, and the
+  explicit ambient context replaces any process-wide `Current`-derived default (no server-side
+  leakage; `nil` on a direct call with none provided).
+- **Added `Axn::MCP.server_context`** — the MCP-specific handle for transport *capabilities*
+  (`Axn::MCP.server_context.report_progress(...)`, `.cancelled?`), the live `MCP::ServerContext`
+  object that doesn't survive `ambient_context`'s declared-key filtering. `nil` outside a wrapped
+  tool call. Scoped via `ActiveSupport::IsolatedExecutionState` (thread/fiber per the configured
+  isolation level), matching how axn scopes its own per-execution state. Data belongs in
+  `ambient_context`; only transport capabilities need this.
+- **MCP error responses carry the Axn's own `result.error`** (axn's `"Something went wrong"` for a
+  bare `fail!` / validation error / unhandled exception, or the explicit `fail!` reason). Declare a
+  per-tool base `error "…"` for a friendlier generic message.
+- Config is declared with axn core's `Axn::Configurable` DSL under `config_namespace :mcp`, so a base
+  Axn composes cleanly with other adapters' per-class config (`configure(:mcp)` /
+  `configure(:other_adapter)`) on the same class.
 
-### Server context & ambient data
+### Removed (breaking)
 
-- `Axn::MCP.wrap` spreads the injected `server_context` **as** the Axn's `ambient_context`, so a tool
-  declares the data it needs generically — `expects :user_id, on: :ambient_context` — and the same
-  class resolves it from the MCP server context, from `Current` on a direct call, or from another
-  adapter, with no MCP-specific intermediate. axn extracts each declared field via `#[]`/`#dig` (so a
-  `Hash` or an `MCP::ServerContext` object both work), and the explicit ambient context replaces any
-  process-wide `Current`-derived default (no server-side leakage).
-- **`Axn::MCP.server_context`** exposes the live `MCP::ServerContext` for transport capabilities
-  (`report_progress`, `cancelled?`) inside a wrapped call — `nil` otherwise — scoped via
-  `ActiveSupport::IsolatedExecutionState` (thread/fiber per the configured isolation level).
+- **`Axn::MCP::Tool` subclass base** — author a plain Axn + `Axn::MCP.wrap` instead. Its dual-mode
+  `.call` (returning `Axn::Result` *or* `MCP::Tool::Response` depending on a `server_context:` kwarg)
+  overrode `input_schema` to a non-Hash `MCP::Tool::InputSchema`, which broke `Axn::RubyLLM.wrap` on
+  the same class. Kept as a raising tombstone with a migration message (deletion at 1.0 — see
+  `DEPRECATIONS.md`).
+- **`Axn::MCP::Tool.define`** — build a one-off inline tool with
+  `Axn::MCP.wrap(Axn::Factory.build(…) { … }, name: "…")`. Also a raising tombstone.
+- **`Axn::MCP.wrap(mcp_text_content:)` kwarg** — renamed to `present_as:`. Kept as a raising alias
+  with a pointed migration error (removed at 1.0). The `mcp_text_content` config setting was renamed
+  to `present_as` (hard rename; nothing released).
+- **`Axn::MCP.config.error_headline`** — the gem no longer imposes a `"Tool call failed"` headline
+  (see the error-response change above).
+- **Annotation bang-methods** (`read_only!` / `destructive!` / `idempotent!` / `open_world!` /
+  `closed_world!`) and the `open_world` / `closed_world` class helpers — declare `semantic_hints` on
+  the plain Axn instead.
+- **`resolved_mcp_text_content`** — read `SomeTool.present_as` (axn core also dropped the
+  `resolved_<name>` reader form).
 
-### Annotations, metadata & response text
+### Fixed
 
-- A class's `semantic_hints` (`:read_only` / `:idempotent` / `:destructive`, plus MCP-only
-  `:open_world` / `:closed_world` registered by this gem) drive MCP annotations by default; an
-  explicit `annotations:` wins.
-- `title` / `icons` / `meta` / `annotations` are settable as `wrap` kwargs or declaratively via
-  `configure(:mcp)` (so they survive the zero-arg `Axn::MCP.tools` path); a `wrap` kwarg wins.
-- **`present_as`** (`:structured` | `:message`) chooses whether the response text block is the
-  serialized `exposes` or the Axn's message (`structuredContent` always carries the exposed data).
-  Settable gem-wide (`Axn::MCP.config.present_as`), per-class (`configure(:mcp)`), or on `wrap`.
-- Failures surface the Axn's own `result.error` — no gem-imposed headline; declare a per-tool base
-  `error "…"` for a friendlier generic message (it prefixes an explicit `fail!("reason")` unless
-  `standalone: true`).
+- Conditionally-required fields (`expects :token, if: :use_token`) reflect as an `allOf` conditional
+  clause instead of an unconditional `required` entry, so `MCP::Server`'s pre-flight
+  `missing_required_arguments?` check no longer rejects a valid call that omits the gated field.
 
-### Configuration
+### Documentation
 
-- Config uses axn core's `Axn::Configurable` DSL under `config_namespace :mcp`, so a base Axn can be
-  configured for this gem and another adapter (e.g. `axn-ruby_llm`) independently on the same class.
+- README re-oriented to author-once (`wrap` / `.tools`, inline `Factory.build` recipe, mixing with
+  native `MCP::Tool` tools). New "Divergences from the raw MCP SDK" section documents the two
+  intentionally-unmapped `MCP::Tool::Response` output affordances (non-text content, response-level
+  `_meta`). Documents that schema reflection is best-effort and biased stricter-than-runtime (naming
+  the one looser-than-runtime case — a field with an invalid literal default), that the gem is scoped
+  to MCP Tools only, and `MCP::ServerContext`'s richer session capabilities (`report_progress`,
+  `cancelled?`).
 
 ### Dependency
 
-- Tracks `axn` git `main` (`github: "teamshares/axn", branch: "main"`) — this release needs axn core
-  reflection, tool-registry, ambient-context, and namespaced-config primitives that have no tagged
-  axn release yet. `Gemfile.lock` is gitignored; `bundle update axn` to advance.
+- Tracks `axn` git `main` (`github: "teamshares/axn", branch: "main"`) — this release needs recent
+  axn core reflection, tool-registry, and namespaced-config primitives that have no tagged axn
+  release yet. `Gemfile.lock` is gitignored; `bundle update axn` to advance.
+
+## 0.1.1
+
+- Migrated internal configuration off hand-rolled code onto the upstream `Axn::Configurable` DSL. The public surface is unchanged: `Axn::MCP.config.mcp_text_content`, per-tool `mcp_text_content(...)` overrides, and `resolved_mcp_text_content` all behave as before.
+- `Axn::MCP::Tool` now declares a base error headline, default `"Tool call failed"` (leveraging axn's error-prefix feature). Failures with no explicit reason — validation errors, unexpected exceptions, bare `fail!` — now surface as the headline alone instead of axn's generic `"Something went wrong"`, and explicit reasons are contextualized as `"<headline>: <reason>"`. The headline is a proper `Axn::MCP.config.error_headline` setting (String, non-blank), resolved fresh on every failure — set it gem-wide with no reload or require-order caveat. Subclasses can still override with their own base `error "..."`, which wins over the configured headline, or opt a single message out with `fail!("...", standalone: true)`. The headline presentation is uniform across `call` and `call!`: a failing `call!` raises an `Axn::Failure` whose `#message` matches `result.error` (e.g. `"Tool call failed: <reason>"`).
+- Requires an `axn` version that ships `Axn::Configurable`, base-`error` prefixing, and the `standalone:` message flag.
+
+## 0.1.0
+
+- Initial release
+- `Axn::MCP::Tool` base class for building MCP tools with Axn
+- Auto-generated JSON schemas from `expects`/`exposes` declarations
+- Automatic `model:` field handling (exposes `_id` field to LLM)
+- Auto-serialization of exposed values to JSON-safe structures
+- Annotation shortcuts: `read_only!`, `destructive!`, `idempotent!`, `open_world!`, `closed_world!`
+- Factory-style `Tool.define` for quick one-off tools
+- Dual-use: returns `Axn::Result` for direct calls, `MCP::Tool::Response` when called via MCP server
+- Typed array element schemas: `Array` fields with `of:` emit a machine-readable `items:` entry in JSON Schema rather than a bare `array` type — scalar types, `:boolean`/`:uuid` shorthands, `Data.define` structs (bare member names), and union types (`anyOf`) are all supported
+- Structured field contracts via `shape:` block: annotate individual element/member types and validations inline; `required` is derived automatically from optional vs non-optional members; blocks recurse for nested objects
+- When `of: <Data.define>` and a `shape:` block are combined, Data members provide the bare-name baseline and block-declared members overlay typed properties (enrich)

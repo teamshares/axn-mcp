@@ -6,12 +6,12 @@ unambiguously cleaned up before the 1.0 release. When cutting 1.0, everything un
 
 ## Retired — stub kept until 1.0 (DELETE at 1.0)
 
-### README "Migrating from the pre-release subclass API" section
+### README "Upgrading from 0.1.x" section
 
-A transitional migration table at the bottom of `README.md` (marked with an `<!-- TEMPORARY … -->`
-comment) for anyone on an unreleased pre-0.2.0 build. **Delete at 1.0** — by then the pre-release
-surface (the `Axn::MCP::Tool` base, `.define`, `mcp_text_content`, `error_headline`, bang-methods)
-is gone entirely and there's nothing to migrate from.
+A transitional `0.1.x → 0.2.0` migration table at the bottom of `README.md` (marked with an
+`<!-- TEMPORARY … -->` comment). **Delete at 1.0** — by then the pre-0.2.0 surface (the
+`Axn::MCP::Tool` base, `.define`, `mcp_text_content`, `error_headline`, bang-methods) is gone
+entirely and there's nothing to migrate from.
 
 ### `Axn::MCP::Tool` (subclass base)
 
