@@ -1,11 +1,25 @@
 inherit_gem:
   axn: .rubocop.yml
 
+# Merge (don't replace) inherited array values, so our AllCops/Exclude below adds to axn's rather
+# than clobbering it (rubocop inheritance REPLACES arrays by default).
+inherit_mode:
+  merge:
+    - Exclude
+
 # Local deltas only — the AllCops preamble (TargetRubyVersion/NewCops/SuggestExtensions) and the
 # shared Style/Metrics body (double_quotes, shorthand hash, trailing commas, disabled
 # Documentation/MultilineBlockChain/SingleLineMethods/DoubleNegation/etc., and the Metrics maxes)
 # come from axn's shared config above. We own both sides of that coupling: an axn cop change may
 # turn this gem's CI red, and we fix it on our own schedule.
+
+# axn's shared config excludes `vendor/**/*`, but paths inherited via inherit_gem resolve relative
+# to axn's gem dir — not this project — so it doesn't cover our own vendor/. CI (ruby/setup-ruby
+# with bundler-cache) installs gems into ./vendor/bundle, and without this RuboCop would lint every
+# vendored gem. Re-declare the exclude project-relative here.
+AllCops:
+  Exclude:
+    - "vendor/**/*"
 
 # Standard for hyphenated gem names — axn's shared config does not configure Naming/FileName.
 Naming/FileName:
