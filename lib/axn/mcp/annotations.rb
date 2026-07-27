@@ -4,7 +4,7 @@ module Axn
   module MCP
     # Maps axn core's `semantic_hints` vocabulary (plus the MCP-only extensions this adapter
     # registers below) to MCP tool annotation kwargs. Registering :open_world/:closed_world via
-    # Axn.extension_config.register_semantic_hint is the poster-child use of PRO-2842's registry:
+    # Axn::Extensions.config.register_semantic_hint is the poster-child use of PRO-2842's registry:
     # no core change was needed to add MCP-spec-only vocabulary.
     module Annotations
       # read_only also asserts destructive_hint: false: MCP::Tool::Annotations defaults

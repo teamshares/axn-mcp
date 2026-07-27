@@ -448,7 +448,7 @@ Generates:
 
 ## Annotations
 
-Declare `axn` core's generic `semantic_hints` DSL (`semantic_hints :read_only, :idempotent, ...`) on your Axn, and `Axn::MCP.wrap` maps them to MCP annotations automatically. This gem registers `:open_world`/`:closed_world` as additional semantic hints (via `Axn.extension_config.register_semantic_hint` — no core change needed for MCP-only vocabulary):
+Declare `axn` core's generic `semantic_hints` DSL (`semantic_hints :read_only, :idempotent, ...`) on your Axn, and `Axn::MCP.wrap` maps them to MCP annotations automatically. This gem registers `:open_world`/`:closed_world` as additional semantic hints (via `Axn::Extensions.config.register_semantic_hint` — no core change needed for MCP-only vocabulary):
 
 | Declared `semantic_hints` | Default annotation      |
 | -------------------------- | ------------------------ |

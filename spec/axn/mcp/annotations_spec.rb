@@ -3,11 +3,11 @@
 RSpec.describe Axn::MCP::Annotations do
   describe "registered vocabulary" do
     it "extends axn core's semantic hint registry with MCP-only hints" do
-      expect(Axn.extension_config.registered_semantic_hints).to include(:open_world, :closed_world)
+      expect(Axn::Extensions.config.registered_semantic_hints).to include(:open_world, :closed_world)
     end
 
     it "keeps axn core's built-in hints registered too" do
-      expect(Axn.extension_config.registered_semantic_hints).to include(:read_only, :idempotent, :destructive)
+      expect(Axn::Extensions.config.registered_semantic_hints).to include(:read_only, :idempotent, :destructive)
     end
   end
 

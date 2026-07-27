@@ -31,7 +31,7 @@ module Axn
         # literal below, so a caller-supplied `ambient_context:`/`"ambient_context"` kwarg (e.g.
         # smuggled in as an extra tool argument from a transport that splats parsed JSON without
         # symbolizing keys first) would otherwise silently win -- Ruby keeps a String key distinct
-        # from the Symbol literal at the splat site, and Axn::Context only symbolizes afterwards
+        # from the Symbol literal at the splat site, and Axn::Core::Context only symbolizes afterwards
         # (last-write-wins on the collision), so `.except` with Symbol keys alone doesn't catch it.
         rest = kwargs.reject { |k, _| %w[server_context ambient_context].include?(k.to_s) }
 

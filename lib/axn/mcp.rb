@@ -7,7 +7,7 @@ require "active_support/deprecation"
 require "active_support/isolated_execution_state"
 
 require_relative "mcp/version"
-Axn.extension_config.register_semantic_hint(:open_world, :closed_world)
+Axn::Extensions.config.register_semantic_hint(:open_world, :closed_world)
 
 module Axn
   module MCP

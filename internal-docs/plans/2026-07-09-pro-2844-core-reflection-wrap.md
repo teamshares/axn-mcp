@@ -2,6 +2,15 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+> **⚠️ Superseded API (2026-07-27, PRO-2950 / axn#195):** This plan predates PRO-2950's
+> extension-config re-home and top-level namespace shrink. Read the core references below as they
+> stood on 2026-07-09 — they are **not** current:
+> - `Axn.extension_config` → now `Axn::Extensions.config` (`Axn::ExtensionConfig` → `Axn::Extensions::Config`, formerly `lib/axn/extension_config.rb`).
+> - `Axn::Context` → now `Axn::Core::Context`.
+>
+> The live gem code/specs/README were migrated with PRO-2950; this historical plan is left as a
+> point-in-time record and intentionally not rewritten.
+
 **Goal:** Consume the JSON-schema reflection, exposed-value serialization, semantic-hints, and
 ambient-context primitives that PRO-2842 landed in `axn` core; delete axn-mcp's hand-rolled
 equivalents; add `Axn::MCP.wrap(any_axn)` so a plain Axn (not subclassing `Axn::MCP::Tool`) can be
