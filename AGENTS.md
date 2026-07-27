@@ -30,9 +30,13 @@ Schemas come from axn core reflection (`axn_class.input_schema`/`output_schema`)
   before trusting existing specs still assert the right strings. `Gemfile.lock` is gitignored; the
   gem tracks axn `main` via `Gemfile`, `bundle update axn` to advance.
 - `bundle exec rspec` + `bundle exec rubocop`. TDD: failing spec first.
+- `bin/setup` installs a lefthook pre-commit hook (`lefthook.yml`) that runs RuboCop **check-only**
+  on staged `*.{rb,rake,gemspec}` and BLOCKS on any offense — fix and re-stage, it does not
+  autocorrect. Skip once with `git commit --no-verify`; CI runs the full `rake` regardless.
 - `CHANGELOG.md` entry per user-visible change; bump `lib/axn/mcp/version.rb` per semver.
 - Update `README.md` when consumer-visible behavior changes (failure/success text shape, config
   surface, schema output, exposure API). Log retirements/removals in `DEPRECATIONS.md`.
-- Internal/superpowers notes (plans, specs, drafts) go in `internal-docs/` — tracked, but excluded
-  from the packaged gem (`spec.files` reject in the gemspec). `docs/` is reserved for a future
-  user-facing (VitePress) site; don't put internal notes there.
+- `spec.files` in the gemspec is an **allowlist** (`lib` + `README`/`CHANGELOG`/`LICENSE`) — new
+  root files don't ship unless you add them there. Internal/superpowers notes (plans, specs, drafts)
+  go in `internal-docs/` — tracked, never packaged. `docs/` is reserved for a future user-facing
+  (VitePress) site; don't put internal notes there.

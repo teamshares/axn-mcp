@@ -107,6 +107,13 @@ reflection rather than gem code.
   to MCP Tools only, and `MCP::ServerContext`'s richer session capabilities (`report_progress`,
   `cancelled?`).
 
+### Packaging
+
+- The packaged gem now ships only its runtime surface — `lib/`, `README.md`, `CHANGELOG.md`, and
+  `LICENSE`. `spec.files` moved from a denylist to an allowlist (mirroring `axn` core), so
+  dev-only artifacts (`AGENTS.md`/`CLAUDE.md`, `DEPRECATIONS.md`, `Rakefile`) that 0.1.0 leaked into
+  the package are no longer shipped.
+
 ### Dependency
 
 - Tracks `axn` git `main` (`github: "teamshares/axn", branch: "main"`) — this release needs recent

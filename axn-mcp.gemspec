@@ -20,16 +20,15 @@ Gem::Specification.new do |spec|
   spec.metadata["changelog_uri"] = "https://github.com/teamshares/axn-mcp/blob/main/CHANGELOG.md"
   spec.metadata["rubygems_mfa_required"] = "true"
 
-  gemspec = File.basename(__FILE__)
-  spec.files = IO.popen(%w[git ls-files -z], chdir: __dir__, err: IO::NULL) do |ls|
-    ls.readlines("\x0", chomp: true).reject do |f|
-      # internal-docs/ holds internal/superpowers drafts (plans, specs) — tracked in the repo but
-      # not shipped in the gem. docs/ is reserved for a future user-facing (VitePress) site.
-      (f == gemspec) ||
-        f.start_with?(*%w[bin/ spec/ internal-docs/ .git .github Gemfile Gemfile.lock .rspec_status pkg/ node_modules/ tmp/ .rspec
-                          .rubocop .tool-versions package.json])
-    end
-  end
+  # Allowlist, not denylist (mirrors axn core): enumerate the small, stable shippable surface —
+  # lib/ plus the user-facing root docs — so dev-only artifacts (AGENTS.md/CLAUDE.md agent
+  # instructions, DEPRECATIONS.md, Rakefile, internal-docs/, tool config) can never silently leak
+  # into the package as new files land. `git ls-files` keeps it to tracked paths.
+  spec.files = IO.popen(
+    %w[git ls-files -z --
+       lib README.md CHANGELOG.md LICENSE],
+    chdir: __dir__, err: IO::NULL,
+  ) { |ls| ls.readlines("\x0", chomp: true) }
   spec.bindir = "exe"
   spec.executables = spec.files.grep(%r{\Aexe/}) { |f| File.basename(f) }
   spec.require_paths = ["lib"]
