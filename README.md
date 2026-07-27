@@ -52,30 +52,10 @@ GreetUserTool = Axn::MCP.wrap(GreetUser) # => an ::MCP::Tool subclass, ready to 
 
 `GreetUser` itself is untouched — `GreetUser.call(name: "Alice")` still returns a plain `Axn::Result`.
 
-`inputSchema`/`outputSchema` generation and exposed-value serialization are both sourced from
-`axn` core's own reflection APIs (`Axn::Reflection::Schema` and `Axn::Reflection::Values`) — this
-gem no longer carries its own schema-building or serialization logic.
-
-**Reflection is best-effort and deliberately biased stricter-than-runtime.** Schemas are built
-*statically* from your `expects`/`exposes` declarations — reflection is side-effect-free and never
-runs your validators. Where a value's wire form isn't *provable* from the declared type, the schema
-reflects the conservative answer (untyped, required, or non-null) rather than guess. The net
-contract: **a client that follows the schema will not be rejected by schema validation; the schema
-may occasionally be more restrictive than what the tool would actually accept at runtime.**
-Concretely, you may see: `type` omitted entirely (an untyped `{}`) when the wire form isn't knowable
-(e.g. a `Numeric`/`Complex` field, or a reader-only/custom-serialized object); `not: { type: "null"
-}` on a required `model:`-generated `_id` (a primary key has no fixed JSON type); `enum:
-[true]`/`[false]` for a `TrueClass`/`FalseClass` field; and `anyOf` for union types.
-
-This isn't an absolute "schema-valid implies success" guarantee, though: a schema-following call can
-still fail axn's own runtime validation in the narrow case where a field's contract is
-self-contradictory — e.g. `expects :name, type: String, default: 123` reflects `name` as *optional*
-(a default is present), but omitting it applies the invalid default and then fails runtime
-validation. Reflection derives requiredness from the declared *signals* (a present default,
-`optional:`/`allow_nil:`/`allow_blank:`) without evaluating whether the default itself is valid —
-catching that would only cover literal defaults, not custom validators, callable defaults, or model
-lookups, so the caveat exists either way. This is the one documented spot where the input schema is
-*looser* than runtime rather than stricter (a known, deliberate gap, not a bug).
+`inputSchema`/`outputSchema` and exposed-value serialization come from `axn` core's reflection APIs
+(`Axn::Reflection::Schema`, `Axn::Reflection::Values`), built statically from your `expects`/`exposes`
+declarations. See [Field declarations & schema](#field-declarations--schema) for the type mappings
+and how reflection handles values whose wire form isn't knowable from the declaration.
 
 ## Exposing tools
 
@@ -110,9 +90,8 @@ GreetUserTool.call(name: "Bob", server_context: { user_id: 42 }) # => MCP::Tool:
 GreetUser.call(name: "Alice")                                    # => Axn::Result (untouched)
 ```
 
-Unlike the retired base, the generated subclass has no dual mode: its `.call` **always** returns
-`MCP::Tool::Response`, and it has no `.call!` (a bang that just delegated to `.call` would promise
-raise-on-failure semantics it can't deliver — call the original Axn's `.call!` if you want those).
+The generated subclass's `.call` **always** returns `MCP::Tool::Response`, and it has no `.call!` —
+if you want raise-on-failure semantics, call the original Axn's `.call!` directly (unwrapped).
 
 ### Every registered tool: `Axn::MCP.tools`
 
@@ -183,8 +162,8 @@ For a curated subset instead of all of them, filter the registry yourself:
 
 ### One-off inline tools
 
-There's no `Axn::MCP.define`; the inline primitive lives in axn core. For a throwaway tool, build a
-plain Axn with `Axn::Factory.build` (block-as-`#call`, no class needed) and wrap it:
+For a throwaway tool, build a plain Axn inline with `Axn::Factory.build` (block-as-`#call`, no named
+class needed) and wrap it:
 
 ```ruby
 # The block is the Axn's #call body — pass it to Axn::Factory.build.
@@ -228,6 +207,29 @@ wrapped Axns get it spread into `ambient_context` (see [Server Context](#server-
 The schema mappings below are axn core reflection surfaced through `wrap` — declare fields on a
 plain Axn (`include Axn`), and the shapes appear on `Axn::MCP.wrap(TheAxn).input_schema_value` /
 `.output_schema`.
+
+### How reflection derives schemas
+
+**Reflection is best-effort and deliberately biased stricter-than-runtime.** Schemas are built
+*statically* from your `expects`/`exposes` declarations — reflection is side-effect-free and never
+runs your validators. Where a value's wire form isn't *provable* from the declared type, the schema
+reflects the conservative answer (untyped, required, or non-null) rather than guess. The net
+contract: **a client that follows the schema will not be rejected by schema validation; the schema
+may occasionally be more restrictive than what the tool would actually accept at runtime.**
+Concretely, you may see: `type` omitted entirely (an untyped `{}`) when the wire form isn't knowable
+(e.g. a `Numeric`/`Complex` field, or a reader-only/custom-serialized object); `not: { type: "null"
+}` on a required `model:`-generated `_id` (a primary key has no fixed JSON type); `enum:
+[true]`/`[false]` for a `TrueClass`/`FalseClass` field; and `anyOf` for union types.
+
+This isn't an absolute "schema-valid implies success" guarantee, though: a schema-following call can
+still fail axn's own runtime validation in the narrow case where a field's contract is
+self-contradictory — e.g. `expects :name, type: String, default: 123` reflects `name` as *optional*
+(a default is present), but omitting it applies the invalid default and then fails runtime
+validation. Reflection derives requiredness from the declared *signals* (a present default,
+`optional:`/`allow_nil:`/`allow_blank:`) without evaluating whether the default itself is valid —
+catching that would only cover literal defaults, not custom validators, callable defaults, or model
+lookups, so the caveat exists either way. This is the one documented spot where the input schema is
+*looser* than runtime rather than stricter (a known, deliberate gap, not a bug).
 
 ### Field Descriptions
 
