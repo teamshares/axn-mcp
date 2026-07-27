@@ -48,6 +48,13 @@ module Axn
         resolved_meta  = meta  || Axn::MCP.resolve_override_for(axn_class, :meta)
         configured_annotations = annotations || Axn::MCP.resolve_override_for(axn_class, :annotations)
 
+        # Surface the resolved revision in `_meta` (never the name -- name is the cross-adapter
+        # identity), so an operator/model can see which version `Axn::MCP.tools` collapsed to. Only
+        # for actually-versioned tools; an unversioned tool (default `tool_version` 1) stays
+        # meta-free. Keyed `tool_version` to mirror the DSL and avoid clobbering a consumer's own
+        # `version` meta key.
+        resolved_meta = { **(resolved_meta || {}), tool_version: axn_class.tool_version } if axn_class.tool_version > 1
+
         Class.new(::MCP::Tool) do
           tool_name(resolved_name)
           description(resolved_description)
@@ -110,7 +117,8 @@ module Axn
       # site) wins; otherwise consume axn core's canonical `tool_name(:mcp)` -- passing the adapter so
       # a per-adapter `tool mcp: { name: "..." }` override wins (PRO-2942), then a shared `tool name:`,
       # then `tool_name_stripped_prefixes` + snake_cased class name. Passing `:mcp` also matches the
-      # name `Axn.tools_for(:mcp)` sorts/dedupes by, so `.tools` and a direct `wrap` agree.
+      # name `Axn.tools_for(:mcp)` sorts / collapses to the latest per `tool_name`, so `.tools` and a
+      # direct `wrap` agree.
       #
       # Core's `tool_name` never returns blank: a truly anonymous, never-named class (no class name,
       # no `axn_name`) falls back to the generic "tool". That's a footgun for wrap's common inline

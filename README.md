@@ -135,6 +135,13 @@ Per-tool customization comes from each class's own declarations (`tool name:`, `
 `semantic_hints`, `configure(:mcp)`), all honored inside `wrap`. It's symmetric with the same
 pattern in sibling adapter gems (e.g. `Axn::RubyLLM.tools`).
 
+**Versioning.** When two Axns share a `tool_name` but declare different `tool_version`s (axn core's
+DSL — identity is `(tool_name, tool_version)`), `Axn.tools_for(:mcp)` returns only the latest, so
+`Axn::MCP.tools` exposes a single tool for that name, resolving to the highest version. For a
+versioned tool (`tool_version > 1`), `wrap` also surfaces the resolved revision as `tool_version` in
+the tool's `_meta` — visible to an operator/model without touching the tool's `name` (its
+cross-adapter identity). Unversioned tools (the default `tool_version` of 1) get no such `_meta`.
+
 ### Membership: directory roots + the `tool` DSL
 
 A class's `:mcp` membership is **`(directory-root grant ∪ tool declaration) − except`**:

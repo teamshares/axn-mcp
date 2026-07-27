@@ -138,6 +138,40 @@ RSpec.describe "Axn::MCP.wrap" do
     expect(tool.meta).to be_nil
   end
 
+  describe "tool_version surfaced in _meta (PRO-2955)" do
+    let(:versioned_axn) do
+      Class.new do
+        include Axn
+
+        def self.name = "SearchWidgetsV2"
+
+        tool_version 2
+        exposes :x, type: String
+        def call = expose(x: "y")
+      end
+    end
+
+    it "surfaces tool_version in _meta for a versioned tool, leaving the name untouched" do
+      tool = Axn::MCP.wrap(versioned_axn, name: "search_widgets", description: "Search")
+
+      expect(tool.name_value).to eq("search_widgets") # identity stays in the name, not the version
+      expect(tool.meta).to eq({ tool_version: 2 })
+    end
+
+    it "adds no _meta for an unversioned tool (default tool_version 1)" do
+      tool = Axn::MCP.wrap(plain_axn, description: "Greets someone")
+
+      expect(tool.meta).to be_nil
+    end
+
+    it "merges alongside a consumer's meta without clobbering their own `version` key" do
+      tool = Axn::MCP.wrap(versioned_axn, name: "search_widgets", description: "Search",
+                                          meta: { version: "marketing-2.0" })
+
+      expect(tool.meta).to eq({ version: "marketing-2.0", tool_version: 2 })
+    end
+  end
+
   describe "tool naming" do
     it "derives a usable MCP tool name from the wrapped Axn's own class name when name: isn't given" do
       # Simulates the real gap: passing wrap's return value straight into an array/inline usage,

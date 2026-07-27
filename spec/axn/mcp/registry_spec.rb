@@ -89,6 +89,36 @@ RSpec.describe "Axn::MCP tool-adapter registration" do
       expect(mine).to eq(%w[aaa_ordering_tool mmm_ordering_tool zzz_ordering_tool])
     end
 
+    it "wraps only the latest version when two tools share a tool_name (PRO-2955)" do
+      # tool_version is identity-distinct from tool_name (core strips the V1/V2 segment, so both
+      # derive tool_name "thing"). Axn.tools_for(:mcp) collapses a shared tool_name to its highest
+      # tool_version, so Axn::MCP.tools -- a plain `.map { wrap }` over it -- exposes only V2.
+      stub_const("AgentTools::Thing::V1", Class.new do
+        include Axn
+
+        tool :mcp
+        tool_version 1
+        description "thing v1"
+        exposes :x, type: String
+        def call = expose(x: "v1")
+      end)
+
+      stub_const("AgentTools::Thing::V2", Class.new do
+        include Axn
+
+        tool :mcp
+        tool_version 2
+        description "thing v2"
+        exposes :x, type: String
+        def call = expose(x: "v2")
+      end)
+
+      versioned = Axn::MCP.tools.select { |t| t.name_value == "thing" }
+
+      expect(versioned.size).to eq(1) # V1 superseded, not a second tool under the same name
+      expect(versioned.first.description).to eq("thing v2") # description derived from V2, the latest
+    end
+
     it "honors a per-class configure(:mcp) override at wrap time" do
       stub_const("ConfiguredToolsTool", Class.new do
         include Axn

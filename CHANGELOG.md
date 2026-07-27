@@ -45,6 +45,11 @@ reflection rather than gem code.
   `configure(:mcp)` form survives the zero-arg `Axn::MCP.tools` path (which calls `wrap` with no
   kwargs); an explicit `wrap` kwarg wins over it. For `annotations`, precedence is `wrap` kwarg →
   `configure(:mcp)` → `semantic_hints`-derived.
+- **Tool versioning (via the axn bump this release requires; axn PRO-2955).** Tool identity is
+  `(tool_name, tool_version)`, so `Axn::MCP.tools` exposes only the latest version when several Axns
+  share a `tool_name` (`Axn.tools_for(:mcp)` collapses to the highest `tool_version`). For a
+  versioned tool (`tool_version > 1`), `wrap` surfaces the resolved revision as `tool_version` in the
+  tool's `_meta` — never in its `name` (the cross-adapter identity). Unversioned tools are unchanged.
 
 ### Changed
 
