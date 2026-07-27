@@ -4,8 +4,6 @@ Build [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) tools usi
 
 **Author once, expose anywhere.** You write a plain Axn — a normal action, usable by any caller — and this gem exposes it as an `::MCP::Tool` with `Axn::MCP.wrap` (one tool) or `Axn::MCP.tools` (every registered tool at once). The Axn stays a plain Axn: called directly it returns an `Axn::Result`, with no MCP awareness. The same action can be exposed to other adapters (e.g. an `axn-ruby_llm`) the same way, from the same class.
 
-> **Migrating from the `Axn::MCP::Tool` subclass base?** It was retired in favor of `Axn::MCP.wrap` (see [DEPRECATIONS.md](DEPRECATIONS.md)). Subclassing it now raises with a migration message. The change is a one-liner per tool — see [Exposing tools](#exposing-tools).
-
 This gem is scoped to MCP **Tools** only. `MCP::Server` also supports `resources`, `resource_templates`, and `prompts` as first-class concepts — `Axn::MCP.wrap` doesn't adapt an Axn into any of those, and there's no `Axn::MCP.wrap_as_resource` or equivalent. If you need those, register them with `MCP::Server` directly per the [MCP Ruby SDK documentation](https://github.com/modelcontextprotocol/ruby-sdk).
 
 ## Installation
