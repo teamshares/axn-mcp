@@ -194,6 +194,81 @@ RSpec.describe "MCP Server Integration", type: :integration do
     end
   end
 
+  describe "unserializable exposed value" do
+    # axn #206 (PRO-2988): Values.serialize_exposed now RAISES (Axn::Reflection::UnserializableValue,
+    # an ArgumentError) rather than emitting a lossy/malformed body — here two Hash keys (:id and
+    # "id") stringify to the same JSON property and would silently collapse. Unlike an exception
+    # *inside* #call (which axn catches into a failed Result — see "exception handling" above), this
+    # raise happens during serialization *after* the Axn ran, outside axn's rescue, so it propagates
+    # to MCP::Server, which converts it into a JSON-RPC internal error. The point of this spec: the
+    # raise surfaces as the transport's error shape, not an escaped exception and not a dropped value.
+    let(:unserializable_axn) do
+      Class.new do
+        include Axn
+
+        def self.name
+          "DupKeyTool"
+        end
+
+        description "Exposes a Hash whose keys collide as one JSON property"
+        exposes :rec
+
+        def call = expose(rec: { id: 1, "id" => 2 })
+      end
+    end
+
+    let(:tools) { [Axn::MCP.wrap(unserializable_axn)] }
+
+    it "surfaces a JSON-RPC error response, not an unhandled exception or a lossy result" do
+      request = json_rpc_request("tools/call", { name: "dup_key_tool", arguments: {} })
+      response = parse_response(server.handle_json(request))
+
+      expect(response).not_to have_key(:result) # not a (silently lossy) tool result
+      expect(response[:error][:code]).to eq(-32_603) # JSON-RPC internal error
+      expect(response[:error][:data]).to include("Internal error calling tool dup_key_tool")
+    end
+  end
+
+  describe "exposed value nested deeper than JSON's max_nesting" do
+    # axn #206 draws a line: serialize_exposed guarantees encodable *values*, but deliberately does
+    # NOT own nesting depth — max_nesting (100 by default) is the encoder's option, not core's. So a
+    # >100-deep (otherwise fine) structure passes serialization and then makes JSON.generate raise
+    # JSON::NestingError. We keep no local rescue around JSON.generate; MCP::Server's own rescue maps
+    # it to the same JSON-RPC error shape, so it still degrades gracefully instead of escaping.
+    let(:deep_axn) do
+      Class.new do
+        include Axn
+
+        def self.name
+          "DeepTool"
+        end
+
+        description "Exposes a structure nested past JSON's default max_nesting"
+        exposes :rec
+
+        def call
+          root = {}
+          node = root
+          200.times do
+            node["n"] = {}
+            node = node["n"]
+          end
+          expose(rec: root)
+        end
+      end
+    end
+
+    let(:tools) { [Axn::MCP.wrap(deep_axn)] }
+
+    it "surfaces a JSON-RPC error response rather than escaping (max_nesting is the encoder's, not core's)" do
+      request = json_rpc_request("tools/call", { name: "deep_tool", arguments: {} })
+      response = parse_response(server.handle_json(request))
+
+      expect(response).not_to have_key(:result)
+      expect(response[:error][:code]).to eq(-32_603)
+    end
+  end
+
   describe "complex tool with multiple fields" do
     let(:create_user_axn) do
       Class.new do
