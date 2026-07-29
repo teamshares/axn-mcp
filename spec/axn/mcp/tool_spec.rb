@@ -461,7 +461,7 @@ RSpec.describe "Axn::MCP.wrap schema reflection" do
 
       it "marks every exposed field required (JSON Schema `required` means presence, not non-null) and reflects optionality as nullability" do
         # NOTE: differs from the old builder, which omitted optional fields from `required`. Every
-        # exposes key is always present in serialize_exposed's output (nil when unset), so JSON Schema
+        # exposes key is always present in the serialized output (nil when unset), so JSON Schema
         # `required` (property PRESENCE) is always true; the optional field's OPTIONALITY instead shows
         # up as a nullable type.
         tool = wrapped do

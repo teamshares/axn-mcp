@@ -2,16 +2,20 @@
 
 RSpec.describe Axn::MCP::Serializer do
   describe ".result_to_mcp_response" do
-    it "serializes exposed values the same way Axn::Reflection::Values does" do
-      config = Struct.new(:field).new(:count)
-      result = double(ok?: true, count: 42, message: "done")
+    it "serializes exposed values through Axn::Extensions::Serialization.render" do
+      tool = Class.new do
+        include Axn
 
-      response = described_class.result_to_mcp_response(result, [config], text_content: :structured)
+        exposes :count, type: Integer
 
-      expect(response.structured_content).to eq(Axn::Reflection::Values.serialize_exposed(result, [config]))
+        def call = expose(count: 42)
+      end
+      result = tool.call
+
+      response = described_class.result_to_mcp_response(result, text_content: :structured)
+
+      expect(response.structured_content).to eq(Axn::Extensions::Serialization.render(result))
     end
-
-    let(:field_configs) { [] }
 
     context "when success with exposed data and text_content: :structured (default)" do
       it "uses JSON of structured content for text block" do
@@ -25,9 +29,8 @@ RSpec.describe Axn::MCP::Serializer do
           end
         end
         result = tool.call
-        configs = tool.external_field_configs
 
-        response = described_class.result_to_mcp_response(result, configs, text_content: :structured)
+        response = described_class.result_to_mcp_response(result, text_content: :structured)
 
         expect(response.content.first[:text]).to eq('{"greeting":"Hi"}')
         expect(response.structured_content).to eq({ "greeting" => "Hi" })
@@ -48,7 +51,7 @@ RSpec.describe Axn::MCP::Serializer do
         end
         result = tool.call
 
-        response = described_class.result_to_mcp_response(result, [], text_content: :structured)
+        response = described_class.result_to_mcp_response(result, text_content: :structured)
 
         expect(response.content.first[:text]).to eq("Done!")
         expect(response.error?).to be false
@@ -68,9 +71,8 @@ RSpec.describe Axn::MCP::Serializer do
           end
         end
         result = tool.call
-        configs = tool.external_field_configs
 
-        response = described_class.result_to_mcp_response(result, configs, text_content: :message)
+        response = described_class.result_to_mcp_response(result, text_content: :message)
 
         expect(response.content.first[:text]).to eq("Custom message")
         expect(response.structured_content).to eq({ "greeting" => "Hi" })
@@ -90,9 +92,8 @@ RSpec.describe Axn::MCP::Serializer do
 
       it "ships the opaque rendering by default (reject_opaque_exposed_values omitted)" do
         result = opaque_tool.call
-        configs = opaque_tool.external_field_configs
 
-        response = described_class.result_to_mcp_response(result, configs, text_content: :structured)
+        response = described_class.result_to_mcp_response(result, text_content: :structured)
 
         expect(response.error?).to be false
         expect(response.structured_content["obj"]).to match(/\A#<Object:0x/)
@@ -100,10 +101,9 @@ RSpec.describe Axn::MCP::Serializer do
 
       it "raises Axn::Reflection::UnserializableValue when reject_opaque_exposed_values: true" do
         result = opaque_tool.call
-        configs = opaque_tool.external_field_configs
 
         expect do
-          described_class.result_to_mcp_response(result, configs, text_content: :structured, reject_opaque_exposed_values: true)
+          described_class.result_to_mcp_response(result, text_content: :structured, reject_opaque_exposed_values: true)
         end.to raise_error(Axn::Reflection::UnserializableValue, /obj/)
       end
     end
@@ -119,7 +119,7 @@ RSpec.describe Axn::MCP::Serializer do
         end
         result = tool.call
 
-        response = described_class.result_to_mcp_response(result, [], text_content: :structured)
+        response = described_class.result_to_mcp_response(result, text_content: :structured)
 
         expect(response.content.first[:text]).to eq("email taken")
         expect(response.error?).to be true

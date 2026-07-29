@@ -195,8 +195,8 @@ RSpec.describe "MCP Server Integration", type: :integration do
   end
 
   describe "unserializable exposed value" do
-    # axn #206 (PRO-2988): Values.serialize_exposed now RAISES (Axn::Reflection::UnserializableValue,
-    # an ArgumentError) rather than emitting a lossy/malformed body — here two Hash keys (:id and
+    # axn #206 (PRO-2988): serialization now RAISES (Axn::Reflection::UnserializableValue, an
+    # ArgumentError) rather than emitting a lossy/malformed body — here two Hash keys (:id and
     # "id") stringify to the same JSON property and would silently collapse. Unlike an exception
     # *inside* #call (which axn catches into a failed Result — see "exception handling" above), this
     # raise happens during serialization *after* the Axn ran, outside axn's rescue, so it propagates
@@ -230,7 +230,7 @@ RSpec.describe "MCP Server Integration", type: :integration do
   end
 
   describe "exposed value nested deeper than JSON's max_nesting" do
-    # axn #206 draws a line: serialize_exposed guarantees encodable *values*, but deliberately does
+    # axn #206 draws a line: serialization guarantees encodable *values*, but deliberately does
     # NOT own nesting depth — max_nesting (100 by default) is the encoder's option, not core's. So a
     # >100-deep (otherwise fine) structure passes serialization and then makes JSON.generate raise
     # JSON::NestingError. We keep no local rescue around JSON.generate; MCP::Server's own rescue maps

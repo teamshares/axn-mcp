@@ -38,7 +38,7 @@ module Axn
         result = Axn::MCP.with_server_context(server_context) do
           axn_class.call(ambient_context: server_context || {}, **rest)
         end
-        Serializer.result_to_mcp_response(result, axn_class.external_field_configs, text_content:, reject_opaque_exposed_values:)
+        Serializer.result_to_mcp_response(result, text_content:, reject_opaque_exposed_values:)
       end
     end
   end

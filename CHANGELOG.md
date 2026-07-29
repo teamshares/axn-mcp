@@ -60,8 +60,9 @@ reflection rather than gem code.
 
 ### Changed
 
-- **Schemas and serialization come from `axn` core** (`Axn::Reflection::Schema` /
-  `Axn::Reflection::Values`), replacing the gem's own builder. Consumer-visible reflection
+- **Schemas and serialization come from `axn` core** — schemas via `Axn::Reflection::Schema` and
+  exposed-value rendering via the `Axn::Extensions::Serialization` facade — replacing the gem's own
+  builder. Consumer-visible reflection
   differences: nullable/optional fields reflect as a `type` array (`["string", "null"]`) rather than
   a bare type; boolean fields gain `enum: [true]`/`[false]`; a `model:` field's generated `_id` no
   longer asserts `type: "integer"` (a primary key's type isn't statically knowable) but forbids

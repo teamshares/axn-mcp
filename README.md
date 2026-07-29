@@ -50,10 +50,11 @@ GreetUserTool = Axn::MCP.wrap(GreetUser) # => an ::MCP::Tool subclass, ready to 
 
 `GreetUser` itself is untouched — `GreetUser.call(name: "Alice")` still returns a plain `Axn::Result`.
 
-`inputSchema`/`outputSchema` and exposed-value serialization come from `axn` core's reflection APIs
-(`Axn::Reflection::Schema`, `Axn::Reflection::Values`), built statically from your `expects`/`exposes`
-declarations. See [Field declarations & schema](#field-declarations--schema) for the type mappings
-and how reflection handles values whose wire form isn't knowable from the declaration.
+`inputSchema`/`outputSchema` come from `axn` core's schema reflection (`Axn::Reflection::Schema`),
+and exposed-value serialization from its serialization facade (`Axn::Extensions::Serialization`),
+both driven by your `expects`/`exposes` declarations. See [Field declarations & schema](#field-declarations--schema)
+for the type mappings and how reflection handles values whose wire form isn't knowable from the
+declaration.
 
 ## Exposing tools
 
