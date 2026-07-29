@@ -29,6 +29,17 @@ module Axn
 
     setting :present_as, default: :structured, one_of: %i[structured message], overridable: true
 
+    # When true, serializing a successful result's `exposes` values rejects any value that has no
+    # JSON rendering its author declared -- one that would otherwise ship as an opaque blob like
+    # `"#<User:0x...>"` (or, in Rails, ActiveSupport's generic instance-variable dump) -- by raising
+    # `Axn::Reflection::UnserializableValue`, which surfaces as the tool's error response. Default
+    # `false`: for an LLM tool result an ugly-but-honest string usually beats a failed call, so the
+    # opaque rendering ships. Applies ONLY to outbound `exposes` serialization, not to inbound
+    # argument handling. (Values with no *honest* JSON form -- cycles, non-finite Floats,
+    # non-UTF-8-encodable bytes, colliding Hash keys -- raise regardless of this flag; it governs only
+    # the extra "was this rendering author-declared?" check.)
+    setting :reject_opaque_exposed_values, default: false, one_of: [true, false], overridable: true
+
     # Per-tool MCP metadata, declarable on the class via `configure(:mcp) { |c| c.title = "..." }`
     # so it survives the zero-arg `Axn::MCP.tools` path (which calls `wrap` with no kwargs). Each
     # defaults to nil -- left at `::MCP::Tool`'s own default unless set -- and an explicit `wrap`

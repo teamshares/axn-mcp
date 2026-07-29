@@ -614,6 +614,28 @@ Axn::MCP.wrap(MyAction, present_as: :message)
 
 `configure(:mcp)` uses axn core's namespaced config DSL. The same base Axn can be composed with another adapter (e.g. an `axn-ruby_llm` gem) via its own `config_namespace` — each adapter's settings live in their own namespace, so `configure(:mcp)` and `configure(:other_adapter)` on the same class never collide.
 
+## Rejecting opaque exposed values (`reject_opaque_exposed_values`)
+
+When a successful result's `exposes` values are serialized into the response, most values have an obvious JSON form (a `String`, a `Hash`, a `Data.define`, …). But an exposed value can be **opaque** — it has no JSON rendering *its author declared*, so it falls back to a generic one that leaks Ruby internals: a bare object serializes to the string `"#<User:0x000055…>"`, and in a Rails app ActiveSupport's generic `as_json` instead dumps the object's instance variables. Concretely, a value is opaque when its only `to_s` is the one inherited from `Object` and it defines no `to_h`/`to_hash`/custom `as_json` — i.e. it never told the serializer how it wants to look as JSON.
+
+`reject_opaque_exposed_values` decides what happens when that occurs:
+
+- **`false` (default)** — the opaque rendering ships. For an LLM tool result an ugly-but-honest string is usually better than a failed call, so this is the default.
+- **`true`** — serialization raises `Axn::Reflection::UnserializableValue` (naming the exact path, e.g. `records[3].owner`), which surfaces as the tool's error response instead of shipping the blob. Use it when a leaked `#<…>` string in a result is worse than a failure.
+
+Set it **gem-wide** (`Axn::MCP.config.reject_opaque_exposed_values = true`) or **per tool** via `configure(:mcp)`; the per-class value wins over the gem-wide one.
+
+```ruby
+class ListOwners
+  include Axn
+  tool :mcp
+  configure(:mcp) { |c| c.reject_opaque_exposed_values = true }
+  # ...
+end
+```
+
+**Scope — this is an output-side check only.** It governs `exposes` serialization, *not* inbound argument handling (that's [`coerce:`](#coercing-loosely-typed-inbound-values-with-coerce)). And it is *narrow*: it toggles only the extra "was this rendering author-declared?" test. Values with no **honest** JSON form at all — a reference cycle, a non-finite `Float` (`Infinity`/`NaN`), bytes with no UTF-8 rendering, or two `Hash` keys that collapse to one property — always raise `Axn::Reflection::UnserializableValue` regardless of this setting, because shipping them would produce a wrong or malformed body. `reject_opaque_exposed_values` only additionally rejects the *honest-but-undeclared* rendering above.
+
 ## Integration with MCP Server
 
 Register your tools with an MCP server:

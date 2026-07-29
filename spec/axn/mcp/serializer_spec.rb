@@ -77,6 +77,37 @@ RSpec.describe Axn::MCP::Serializer do
       end
     end
 
+    context "with an opaque exposed value (one with no author-declared JSON rendering)" do
+      let(:opaque_tool) do
+        Class.new do
+          include Axn
+
+          exposes :obj
+
+          def call = expose(obj: Object.new)
+        end
+      end
+
+      it "ships the opaque rendering by default (reject_opaque_exposed_values omitted)" do
+        result = opaque_tool.call
+        configs = opaque_tool.external_field_configs
+
+        response = described_class.result_to_mcp_response(result, configs, text_content: :structured)
+
+        expect(response.error?).to be false
+        expect(response.structured_content["obj"]).to match(/\A#<Object:0x/)
+      end
+
+      it "raises Axn::Reflection::UnserializableValue when reject_opaque_exposed_values: true" do
+        result = opaque_tool.call
+        configs = opaque_tool.external_field_configs
+
+        expect do
+          described_class.result_to_mcp_response(result, configs, text_content: :structured, reject_opaque_exposed_values: true)
+        end.to raise_error(Axn::Reflection::UnserializableValue, /obj/)
+      end
+    end
+
     context "when error" do
       it "uses result.error for text and sets error: true" do
         tool = Class.new do

@@ -37,6 +37,13 @@ reflection rather than gem code.
   (`Axn::MCP.config.present_as`), per-class (`configure(:mcp) { |c| c.present_as = … }`), or on
   `Axn::MCP.wrap(present_as:)` (most-local wins). `:structured` is the default; `structuredContent`
   always carries the exposed data regardless.
+- `reject_opaque_exposed_values` (boolean, default `false`) — when an `exposes` value has no JSON
+  rendering its author declared (it would ship as `"#<User:0x…>"`, or an ActiveSupport
+  instance-variable dump under Rails), `true` fails the call with `Axn::Reflection::UnserializableValue`
+  (surfaced as the tool's error response) instead of shipping that blob. Settable gem-wide
+  (`Axn::MCP.config.reject_opaque_exposed_values`) or per-class (`configure(:mcp)`), per-class wins.
+  Output-side only (not inbound `coerce:`), and narrow — values with no *honest* JSON form (cycles,
+  non-finite Floats, non-UTF-8 bytes, colliding Hash keys) raise regardless (axn #206 / PRO-2988).
 - `open_world` / `closed_world` registered as MCP-only `semantic_hints`. A class's `semantic_hints`
   (`:read_only` / `:idempotent` / `:destructive` / `:open_world` / `:closed_world`) drive its MCP
   annotations by default; an explicit `annotations:` on `wrap` always wins.

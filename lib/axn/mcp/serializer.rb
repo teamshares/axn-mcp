@@ -8,9 +8,9 @@ module Axn
     module Serializer
       module_function
 
-      def result_to_mcp_response(result, field_configs, text_content: :structured)
+      def result_to_mcp_response(result, field_configs, text_content: :structured, reject_opaque_exposed_values: false)
         if result.ok?
-          exposed = Axn::Reflection::Values.serialize_exposed(result, field_configs)
+          exposed = Axn::Reflection::Values.serialize_exposed(result, field_configs, reject_opaque: reject_opaque_exposed_values)
           success_text = success_response_text(result, exposed, text_content)
           ::MCP::Tool::Response.new(
             [{ type: "text", text: success_text }],

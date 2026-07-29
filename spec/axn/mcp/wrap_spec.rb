@@ -329,4 +329,53 @@ RSpec.describe "Axn::MCP.wrap" do
       expect(JSON.parse(response.content.first[:text])).to have_key("greeting")
     end
   end
+
+  describe "reject_opaque_exposed_values resolution" do
+    # An Axn exposing a value with no author-declared JSON rendering (a bare Object) -- it serializes
+    # to "#<Object:0x...>". Resolved fresh at each call: configure(:mcp) override > gem-wide config.
+    let(:opaque_axn) do
+      Class.new do
+        include Axn
+
+        def self.name = "OpaqueExposer"
+
+        exposes :obj
+
+        def call = expose(obj: Object.new)
+      end
+    end
+
+    after { Axn::MCP.reset_config! }
+
+    it "ships the opaque rendering by default (gem-wide config is false)" do
+      response = Axn::MCP.wrap(opaque_axn).call(server_context: {})
+
+      expect(response.error?).to be false
+      expect(response.structured_content["obj"]).to match(/\A#<Object:0x/)
+    end
+
+    it "raises Axn::Reflection::UnserializableValue when the gem-wide config is true" do
+      Axn::MCP.config.reject_opaque_exposed_values = true
+
+      expect { Axn::MCP.wrap(opaque_axn).call(server_context: {}) }
+        .to raise_error(Axn::Reflection::UnserializableValue, /obj/)
+    end
+
+    it "honors a per-class configure(:mcp) override (survives the zero-arg tools path)" do
+      opaque_axn.configure(:mcp) { |c| c.reject_opaque_exposed_values = true }
+
+      expect { Axn::MCP.wrap(opaque_axn).call(server_context: {}) }
+        .to raise_error(Axn::Reflection::UnserializableValue, /obj/)
+    end
+
+    it "lets a per-class false override win over a gem-wide true" do
+      Axn::MCP.config.reject_opaque_exposed_values = true
+      opaque_axn.configure(:mcp) { |c| c.reject_opaque_exposed_values = false }
+
+      response = Axn::MCP.wrap(opaque_axn).call(server_context: {})
+
+      expect(response.error?).to be false
+      expect(response.structured_content["obj"]).to match(/\A#<Object:0x/)
+    end
+  end
 end

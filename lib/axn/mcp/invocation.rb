@@ -17,7 +17,7 @@ module Axn
     module Invocation
       module_function
 
-      def perform(axn_class, kwargs, text_content:)
+      def perform(axn_class, kwargs, text_content:, reject_opaque_exposed_values: false)
         # Prefer the Symbol key WHENEVER PRESENT (key?, not `||`/truthiness): an explicit
         # server_context: nil must win over a String-keyed value, or a caller could forge
         # server_context by appending an extra "server_context" argument alongside a real, explicit
@@ -38,7 +38,7 @@ module Axn
         result = Axn::MCP.with_server_context(server_context) do
           axn_class.call(ambient_context: server_context || {}, **rest)
         end
-        Serializer.result_to_mcp_response(result, axn_class.external_field_configs, text_content:)
+        Serializer.result_to_mcp_response(result, axn_class.external_field_configs, text_content:, reject_opaque_exposed_values:)
       end
     end
   end
