@@ -32,7 +32,7 @@ module Axn
     # When true, serializing a successful result's `exposes` values rejects any value that has no
     # JSON rendering its author declared -- one that would otherwise ship as an opaque blob like
     # `"#<User:0x...>"` (or, in Rails, ActiveSupport's generic instance-variable dump) -- by raising
-    # `Axn::Reflection::UnserializableValue`, which surfaces as the tool's error response. Default
+    # `Axn::Extensions::Serialization::UnserializableValue`, which surfaces as the tool's error response. Default
     # `false`: for an LLM tool result an ugly-but-honest string usually beats a failed call, so the
     # opaque rendering ships. Applies ONLY to outbound `exposes` serialization, not to inbound
     # argument handling. (Values with no *honest* JSON form -- cycles, non-finite Floats,
@@ -87,9 +87,9 @@ module Axn
     # Register :mcp with axn core's process-global tool registry, passing this module as the config
     # source (PRO-2943/PRO-2944) so the registry reads `Axn::MCP.config.tool_roots` for
     # directory-based membership. A consumer builds its server tool list from `Axn::MCP.tools`
-    # (`Axn.tools_for(:mcp)`) -- resolving directory-root grants, an explicit `tool`/`tool :mcp`
+    # (`Axn::Tools.for(:mcp)`) -- resolving directory-root grants, an explicit `tool`/`tool :mcp`
     # declaration, and implicit `configure(:mcp)` membership -- instead of a hand-maintained array.
-    Axn.register_tool_adapter(:mcp, self)
+    Axn::Tools.register_adapter(:mcp, self)
   end
 end
 

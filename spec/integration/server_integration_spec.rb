@@ -195,7 +195,7 @@ RSpec.describe "MCP Server Integration", type: :integration do
   end
 
   describe "unserializable exposed value" do
-    # axn #206 (PRO-2988): serialization now RAISES (Axn::Reflection::UnserializableValue, an
+    # axn #206 (PRO-2988): serialization now RAISES (Axn::Extensions::Serialization::UnserializableValue, an
     # ArgumentError) rather than emitting a lossy/malformed body — here two Hash keys (:id and
     # "id") stringify to the same JSON property and would silently collapse. Unlike an exception
     # *inside* #call (which axn catches into a failed Result — see "exception handling" above), this
@@ -303,8 +303,8 @@ RSpec.describe "MCP Server Integration", type: :integration do
       input_schema = tool[:inputSchema]
       expect(input_schema[:properties][:email][:type]).to eq("string")
       expect(input_schema[:properties][:role][:enum]).to eq(%w[admin member guest])
-      # Nullable (optional:) fields reflect as a type array, not a bare type -- see
-      # Axn::Reflection::Schema's documented nullability behavior.
+      # Nullable (optional:) fields reflect as a type array, not a bare type -- axn core's documented
+      # input_schema nullability behavior.
       expect(input_schema[:properties][:age][:type]).to eq(%w[integer null])
       expect(input_schema[:required]).to include("email", "role")
       expect(input_schema[:required]).not_to include("age")

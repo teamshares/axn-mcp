@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 # PRO-2923: axn-mcp registers itself as a tool adapter with axn core's process-global tool
-# registry, so a consumer can enumerate its MCP tools via `Axn.tools_for(:mcp)` instead of
+# registry, so a consumer can enumerate its MCP tools via `Axn::Tools.for(:mcp)` instead of
 # hand-maintaining an array.
 RSpec.describe "Axn::MCP tool-adapter registration" do
   it "registers the :mcp adapter with axn core at load" do
@@ -27,7 +27,7 @@ RSpec.describe "Axn::MCP tool-adapter registration" do
     end
   end
 
-  it "lets a consumer enumerate :mcp tools via Axn.tools_for(:mcp)" do
+  it "lets a consumer enumerate :mcp tools via Axn::Tools.for(:mcp)" do
     stub_const("EnumerableMcpTool", Class.new do
       include Axn
 
@@ -36,7 +36,7 @@ RSpec.describe "Axn::MCP tool-adapter registration" do
       def call = expose(x: "y")
     end)
 
-    expect(Axn.tools_for(:mcp)).to include(EnumerableMcpTool)
+    expect(Axn::Tools.for(:mcp)).to include(EnumerableMcpTool)
   end
 
   describe "Axn::MCP.tools" do
@@ -57,8 +57,8 @@ RSpec.describe "Axn::MCP tool-adapter registration" do
       expect(listed.description).to eq("Listed tool") # zero-arg: description derived from the Axn
     end
 
-    it "returns tools deterministically ordered by tool_name (via core's tools_for sort)" do
-      # Registered out of alphabetical order; core's tools_for sorts by tool_name, so Axn::MCP.tools
+    it "returns tools deterministically ordered by tool_name (via core's Axn::Tools.for sort)" do
+      # Registered out of alphabetical order; core's Axn::Tools.for sorts by tool_name, so Axn::MCP.tools
       # is stable regardless of load/registration order (a property both adapter gems inherit).
       stub_const("ZzzOrderingTool", Class.new do
         include Axn
@@ -91,7 +91,7 @@ RSpec.describe "Axn::MCP tool-adapter registration" do
 
     it "wraps only the latest version when two tools share a tool_name (PRO-2955)" do
       # tool_version is identity-distinct from tool_name (core strips the V1/V2 segment, so both
-      # derive tool_name "thing"). Axn.tools_for(:mcp) collapses a shared tool_name to its highest
+      # derive tool_name "thing"). Axn::Tools.for(:mcp) collapses a shared tool_name to its highest
       # tool_version, so Axn::MCP.tools -- a plain `.map { wrap }` over it -- exposes only V2.
       stub_const("AgentTools::Thing::V1", Class.new do
         include Axn
@@ -147,7 +147,7 @@ RSpec.describe "Axn::MCP tool-adapter registration" do
       def call = expose(x: "y")
     end)
 
-    tools = Axn.tools_for(:mcp).select { |t| t == WrappableMcpTool }
+    tools = Axn::Tools.for(:mcp).select { |t| t == WrappableMcpTool }
     wrapped = tools.map { |t| Axn::MCP.wrap(t) }
 
     expect(wrapped.first).to be < MCP::Tool

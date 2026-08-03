@@ -4,7 +4,7 @@
 
 Author-once model: write a plain Axn (`include Axn`); expose it as an `::MCP::Tool` with
 `Axn::MCP.wrap(axn_class, ...)` (one) or `Axn::MCP.tools` (every registered `:mcp` tool —
-`Axn.tools_for(:mcp).map { wrap }`). `wrap` returns a `Class.new(::MCP::Tool)` whose `.call` always
+`Axn::Tools.for(:mcp).map { wrap }`). `wrap` returns a `Class.new(::MCP::Tool)` whose `.call` always
 returns `MCP::Tool::Response`; the original Axn is untouched (direct `.call` still returns
 `Axn::Result`). `server_context:` is routed into the Axn's `ambient_context` by `wrap`/`Invocation`.
 Schemas come from axn core reflection (`axn_class.input_schema`/`output_schema`), not gem code.
@@ -16,7 +16,7 @@ Schemas come from axn core reflection (`axn_class.input_schema`/`output_schema`)
   `DEPRECATIONS.md`).
 - Config is `Axn::Configurable` (`lib/axn/mcp.rb`) — add a `setting`, not a hand-rolled class. Register
   gem-level integrations with core at load: `register_semantic_hint`, and
-  `register_tool_adapter(:mcp, self)` (pass `Axn::MCP` as the config source). `Axn::MCP` `extend`s
+  `Axn::Tools.register_adapter(:mcp, self)` (pass `Axn::MCP` as the config source). `Axn::MCP` `extend`s
   `Axn::Tools::AdapterRoots` and ships `tool_roots` default `["agent_tools"]`; membership is
   `(directory-root grant ∪ tool declaration) − except`. There is no `Axn.config.tool_paths`.
 - Verify schema output against real `MCP::Tool::Response`/`InputSchema`/`OutputSchema` objects, not

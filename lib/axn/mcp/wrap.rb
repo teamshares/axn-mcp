@@ -29,7 +29,7 @@ module Axn
       # and its `tool name:`/`description`, not per-call kwargs -- so a consumer registers tools with
       # just `MCP::Server.new(tools: Axn::MCP.tools, ...)` instead of a hand-maintained array.
       def tools
-        Axn.tools_for(:mcp).map { |axn_class| wrap(axn_class) }
+        Axn::Tools.for(:mcp).map { |axn_class| wrap(axn_class) }
       end
 
       def wrap(axn_class, description: nil, name: nil, title: nil, icons: nil, meta: nil, annotations: nil,
@@ -62,10 +62,9 @@ module Axn
           icons(resolved_icons) if resolved_icons
           meta(resolved_meta) if resolved_meta
 
-          # axn_class.input_schema/.output_schema are axn core's own public reflection surface
-          # (Axn::Core::SchemaReflection) -- wiring to those directly, rather than reaching past
-          # them for the lower-level Axn::Reflection::Schema.build_input/build_output the wrapped
-          # Axn's own methods already call, keeps this on the documented entry point.
+          # axn_class.input_schema/.output_schema are axn core's own public reflection entry points --
+          # wiring to those directly, rather than reaching past them for the lower-level builder the
+          # wrapped Axn's own methods already call, keeps this on the documented surface.
           input_schema(axn_class.input_schema)
           output_schema(axn_class.output_schema) unless axn_class.external_field_configs.empty?
 
@@ -120,7 +119,7 @@ module Axn
       # site) wins; otherwise consume axn core's canonical `tool_name(:mcp)` -- passing the adapter so
       # a per-adapter `tool mcp: { name: "..." }` override wins (PRO-2942), then a shared `tool name:`,
       # then `tool_name_stripped_prefixes` + snake_cased class name. Passing `:mcp` also matches the
-      # name `Axn.tools_for(:mcp)` sorts / collapses to the latest per `tool_name`, so `.tools` and a
+      # name `Axn::Tools.for(:mcp)` sorts / collapses to the latest per `tool_name`, so `.tools` and a
       # direct `wrap` agree.
       #
       # Core's `tool_name` never returns blank: a truly anonymous, never-named class (no class name,

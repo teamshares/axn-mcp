@@ -551,7 +551,9 @@ RSpec.describe "Axn::MCP.wrap schema reflection" do
           end
         end
         properties = tool.output_schema_value.to_h[:properties]
-        expect(properties[:entries]).to eq({ type: "array" })
+        # No `items` overlay (the point of this spec); `minItems: 1` is axn core reflecting the
+        # required field's non-blank presence validation, orthogonal to the shape/of: question.
+        expect(properties[:entries]).to eq({ type: "array", minItems: 1 })
       end
 
       it "emits properties directly on a Hash field's shape: block" do

@@ -21,7 +21,7 @@ reflection rather than gem code.
   wrapped and deterministically ordered by `tool_name`. `MCP::Server.new(tools: Axn::MCP.tools)`.
   Symmetric with `Axn::RubyLLM.tools`.
 - Registers `:mcp` as a tool adapter with axn core's process-global registry, passing `Axn::MCP`
-  itself as the config source (`Axn.register_tool_adapter(:mcp, self)`) so the registry reads
+  itself as the config source (`Axn::Tools.register_adapter(:mcp, self)`) so the registry reads
   `Axn::MCP.config.tool_roots` for directory-based tool membership. `Axn::MCP` `extend`s
   `Axn::Tools::AdapterRoots` and ships a default `tool_roots` of `["agent_tools"]` — an Axn under
   `app/agent_tools/` is exposed as an MCP tool with no `tool :mcp` declaration, and (since
@@ -39,7 +39,7 @@ reflection rather than gem code.
   always carries the exposed data regardless.
 - `reject_opaque_exposed_values` (boolean, default `false`) — when an `exposes` value has no JSON
   rendering its author declared (it would ship as `"#<User:0x…>"`, or an ActiveSupport
-  instance-variable dump under Rails), `true` fails the call with `Axn::Reflection::UnserializableValue`
+  instance-variable dump under Rails), `true` fails the call with `Axn::Extensions::Serialization::UnserializableValue`
   (surfaced as the tool's error response) instead of shipping that blob. Settable gem-wide
   (`Axn::MCP.config.reject_opaque_exposed_values`) or per-class (`configure(:mcp)`), per-class wins.
   Output-side only (not inbound `coerce:`), and narrow — values with no *honest* JSON form (cycles,
@@ -54,15 +54,15 @@ reflection rather than gem code.
   `configure(:mcp)` → `semantic_hints`-derived.
 - **Tool versioning (via the axn bump this release requires; axn PRO-2955).** Tool identity is
   `(tool_name, tool_version)`, so `Axn::MCP.tools` exposes only the latest version when several Axns
-  share a `tool_name` (`Axn.tools_for(:mcp)` collapses to the highest `tool_version`). For a
+  share a `tool_name` (`Axn::Tools.for(:mcp)` collapses to the highest `tool_version`). For a
   versioned tool (`tool_version > 1`), `wrap` surfaces the resolved revision as `tool_version` in the
   tool's `_meta` — never in its `name` (the cross-adapter identity). Unversioned tools are unchanged.
 
 ### Changed
 
-- **Schemas and serialization come from `axn` core** — schemas via `Axn::Reflection::Schema` and
-  exposed-value rendering via the `Axn::Extensions::Serialization` facade — replacing the gem's own
-  builder. Consumer-visible reflection
+- **Schemas and serialization come from `axn` core** — schemas from your `expects`/`exposes`
+  declarations and exposed-value rendering via the `Axn::Extensions::Serialization` facade —
+  replacing the gem's own builder. Consumer-visible reflection
   differences: nullable/optional fields reflect as a `type` array (`["string", "null"]`) rather than
   a bare type; boolean fields gain `enum: [true]`/`[false]`; a `model:` field's generated `_id` no
   longer asserts `type: "integer"` (a primary key's type isn't statically knowable) but forbids

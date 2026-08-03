@@ -354,18 +354,18 @@ RSpec.describe "Axn::MCP.wrap" do
       expect(response.structured_content["obj"]).to match(/\A#<Object:0x/)
     end
 
-    it "raises Axn::Reflection::UnserializableValue when the gem-wide config is true" do
+    it "raises Axn::Extensions::Serialization::UnserializableValue when the gem-wide config is true" do
       Axn::MCP.config.reject_opaque_exposed_values = true
 
       expect { Axn::MCP.wrap(opaque_axn).call(server_context: {}) }
-        .to raise_error(Axn::Reflection::UnserializableValue, /obj/)
+        .to raise_error(Axn::Extensions::Serialization::UnserializableValue, /obj/)
     end
 
     it "honors a per-class configure(:mcp) override (survives the zero-arg tools path)" do
       opaque_axn.configure(:mcp) { |c| c.reject_opaque_exposed_values = true }
 
       expect { Axn::MCP.wrap(opaque_axn).call(server_context: {}) }
-        .to raise_error(Axn::Reflection::UnserializableValue, /obj/)
+        .to raise_error(Axn::Extensions::Serialization::UnserializableValue, /obj/)
     end
 
     it "lets a per-class false override win over a gem-wide true" do

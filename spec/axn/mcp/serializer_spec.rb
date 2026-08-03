@@ -99,12 +99,12 @@ RSpec.describe Axn::MCP::Serializer do
         expect(response.structured_content["obj"]).to match(/\A#<Object:0x/)
       end
 
-      it "raises Axn::Reflection::UnserializableValue when reject_opaque_exposed_values: true" do
+      it "raises Axn::Extensions::Serialization::UnserializableValue when reject_opaque_exposed_values: true" do
         result = opaque_tool.call
 
         expect do
           described_class.result_to_mcp_response(result, text_content: :structured, reject_opaque_exposed_values: true)
-        end.to raise_error(Axn::Reflection::UnserializableValue, /obj/)
+        end.to raise_error(Axn::Extensions::Serialization::UnserializableValue, /obj/)
       end
     end
 
