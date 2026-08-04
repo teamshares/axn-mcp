@@ -11,9 +11,26 @@ RSpec.describe Axn::MCP do
     end
   end
 
-  describe "SchemaError" do
+  describe "Error" do
     it "is a StandardError subclass" do
+      expect(Axn::MCP::Error).to be < StandardError
+    end
+
+    it "declares core's Axn::Error public-error boundary, so `rescue Axn::Error` catches it (PRO-2997)" do
+      expect(Axn::MCP::Error).to be < Axn::Error
+      expect { raise Axn::MCP::Error, "boom" }.to raise_error(Axn::Error)
+    end
+  end
+
+  describe "SchemaError" do
+    it "is an Axn::MCP::Error (and thus a StandardError) subclass" do
+      expect(Axn::MCP::SchemaError).to be < Axn::MCP::Error
       expect(Axn::MCP::SchemaError).to be < StandardError
+    end
+
+    it "is caught by `rescue Axn::Error`" do
+      expect { raise Axn::MCP::SchemaError, "Invalid schema" }
+        .to raise_error(Axn::Error, "Invalid schema")
     end
 
     it "can be raised with a message" do

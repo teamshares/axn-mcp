@@ -57,6 +57,9 @@ reflection rather than gem code.
   share a `tool_name` (`Axn::Tools.for(:mcp)` collapses to the highest `tool_version`). For a
   versioned tool (`tool_version > 1`), `wrap` surfaces the resolved revision as `tool_version` in the
   tool's `_meta` — never in its `name` (the cross-adapter identity). Unversioned tools are unchanged.
+- `Axn::MCP::Error` base error class, marked with axn core's `Axn::Error` boundary (axn PRO-2997), so
+  a consumer's `rescue Axn::Error` catches this gem's errors alongside core's and the other adapter
+  gems'. `Axn::MCP::SchemaError` now subclasses it (still a `StandardError`).
 
 ### Changed
 

@@ -16,7 +16,14 @@ module Axn
 
     config_namespace :mcp
 
-    class SchemaError < StandardError; end
+    # Base error for this gem, marked with core's `Axn::Error` boundary (PRO-2997) so a consumer's
+    # `rescue Axn::Error` catches it alongside axn core's errors and the other adapter gems'.
+    # `Axn::Error` is a marker module -- including it adds no ancestry. New gem errors subclass this.
+    class Error < StandardError
+      include Axn::Error
+    end
+
+    class SchemaError < Error; end
 
     # `extend Axn::Tools::AdapterRoots` declares a validated `tool_roots` directory list (default
     # []); the registry reads `Axn::MCP.config.tool_roots` for directory-based tool membership.
