@@ -229,6 +229,12 @@ catching that would only cover literal defaults, not custom validators, callable
 lookups, so the caveat exists either way. This is the one documented spot where the input schema is
 *looser* than runtime rather than stricter (a known, deliberate gap, not a bug).
 
+**Required fields also carry a presence constraint.** axn requires non-blank values by default, so a
+required `String` reflects `minLength: 1` and a required `Array` reflects `minItems: 1` (an *optional*
+field is nullable instead — e.g. `["string", "null"]` — and carries no minimum). The per-feature
+examples below omit these for focus, but real `inputSchema`/`outputSchema` output includes them on
+every required string/array field.
+
 ### Field Descriptions
 
 Use `description:` directly as a kwarg on `expects` and `exposes`:

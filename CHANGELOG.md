@@ -70,9 +70,11 @@ reflection rather than gem code.
   a bare type; boolean fields gain `enum: [true]`/`[false]`; a `model:` field's generated `_id` no
   longer asserts `type: "integer"` (a primary key's type isn't statically knowable) but forbids
   `null` when required; every `exposes` field is listed in output `required` (optionality shows up as
-  a nullable `type`); a `Numeric` field's output type is omitted (it admits `Complex`); and a
+  a nullable `type`); a `Numeric` field's output type is omitted (it admits `Complex`); a
   `shape:` block on an `Array` field with no `of:` is no longer reflected in the *output* schema
-  (combine `shape:` with `of:` for typed output items — input schema is unaffected).
+  (combine `shape:` with `of:` for typed output items — input schema is unaffected); and a required
+  `String`/`Array` field reflects axn's non-blank presence validation as `minLength: 1`/`minItems: 1`
+  (an optional field is nullable instead, with no minimum).
 - **`server_context` is spread into the Axn's `ambient_context`.** `Axn::MCP.wrap` passes the
   injected `server_context` *as* the Axn's `ambient_context` (not nested under a `server_context`
   key), so a tool declares the data it needs directly and generically — `expects :user_id, on:
