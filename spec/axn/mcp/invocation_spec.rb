@@ -86,5 +86,56 @@ RSpec.describe Axn::MCP::Invocation do
         expect(Axn::MCP.server_context).to be_nil # restored after the call
       end
     end
+
+    describe "transport-failure guard (upholds axn's non-bang never-raises at the adapter boundary)" do
+      # Exposes a value with no honest JSON form, so serialization raises AFTER the Axn already
+      # succeeded -- in the transport layer, outside core's executor (the gap core's own on_exception
+      # doesn't cover). The guard turns that into an error response + a global on_exception report.
+      let(:dup_key_axn) do
+        Class.new do
+          include Axn
+
+          def self.name = "GuardDupKey"
+
+          exposes :rec
+          def call = expose(rec: { id: 1, "id" => 2 })
+        end
+      end
+
+      it "returns an error response instead of letting .call escape the exception" do
+        response = described_class.perform(dup_key_axn, {}, text_content: :structured)
+
+        expect(response).to be_a(MCP::Tool::Response)
+        expect(response.error?).to be true
+        expect(response.content.first[:text]).to eq("The tool could not produce a valid response")
+      end
+
+      it "reports the failure through axn's global on_exception hook (observability, not silent)" do
+        captured = nil
+        allow(Axn.config).to receive(:on_exception) { |e, **| captured = e }
+
+        described_class.perform(dup_key_axn, {}, text_content: :structured)
+
+        expect(captured).to be_a(Axn::Extensions::Serialization::UnserializableValue)
+      end
+
+      it "re-raises rather than swallowing when core's raises_in_dev? is on (bugs surface loudly)" do
+        allow(Axn::Extensions).to receive(:raises_in_dev?).and_return(true)
+
+        expect { described_class.perform(dup_key_axn, {}, text_content: :structured) }
+          .to raise_error(Axn::Extensions::Serialization::UnserializableValue)
+      end
+
+      it "guards ANY StandardError from the transport step, not only serialization" do
+        allow(Axn::MCP::Serializer).to receive(:result_to_mcp_response).and_raise(RuntimeError, "boom")
+        captured = nil
+        allow(Axn.config).to receive(:on_exception) { |e, **| captured = e }
+
+        response = described_class.perform(user_id_axn, {}, text_content: :structured)
+
+        expect(response.error?).to be true
+        expect(captured).to be_a(RuntimeError)
+      end
+    end
   end
 end

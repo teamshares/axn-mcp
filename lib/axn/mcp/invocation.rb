@@ -38,7 +38,26 @@ module Axn
         result = Axn::MCP.with_server_context(server_context) do
           axn_class.call(ambient_context: server_context || {}, **rest)
         end
-        Serializer.result_to_mcp_response(result, text_content:, reject_opaque_exposed_values:)
+
+        # Uphold axn's non-bang "never raises" contract at the adapter boundary. The wrapped Axn's own
+        # `.call` never raises -- core catches action exceptions into a failed Result and pages
+        # on_exception itself -- but the TRANSPORT layer that runs AFTER it (exposed-value
+        # serialization, response building) can raise outside core's executor: a value with no honest
+        # JSON form (dup keys, non-finite float, non-UTF-8 bytes, an opaque value under
+        # reject_opaque_exposed_values), a structure past JSON's max_nesting, or a gem bug. Scope the
+        # guard to just that step (NOT axn_class.call, which already handles its own exceptions, to
+        # avoid double-reporting), report through axn's global on_exception hook for observability,
+        # then -- honoring core's `best_effort_raises_in_dev` so a real bug surfaces loudly rather
+        # than being masked -- re-raise in dev, otherwise return an error response so `.call` ALWAYS
+        # yields an MCP::Tool::Response on every transport (not an escaped exception).
+        begin
+          Serializer.result_to_mcp_response(result, text_content:, reject_opaque_exposed_values:)
+        rescue StandardError => e
+          Axn.config.on_exception(e, action: axn_class, context: { source: "Axn::MCP" })
+          raise if Axn::Extensions.raises_in_dev?
+
+          Serializer.error_response(Serializer::ADAPTER_FAILURE_MESSAGE)
+        end
       end
     end
   end

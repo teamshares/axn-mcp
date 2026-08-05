@@ -26,19 +26,6 @@ RSpec.describe "MCP Server Integration", type: :integration do
     JSON.parse(json, symbolize_names: true)
   end
 
-  # A raise that happens mid-serialization (after the Axn ran) is caught by MCP::Server, but the
-  # SUPPORTED mcp range surfaces it two ways: a top-level JSON-RPC error object (mcp >= ~1.0) or a
-  # tool result with `isError: true` (older). Both satisfy the invariant these specs care about —
-  # the raise is caught and surfaced, never escaped and never dropped as a clean success. Assert the
-  # invariant, not one version's shape.
-  def surfaced_failure?(response)
-    response.key?(:error) || response.dig(:result, :isError) == true
-  end
-
-  def surfaced_error_text(response)
-    response.dig(:error, :data) || response.dig(:error, :message) || response.dig(:result, :content, 0, :text)
-  end
-
   describe "tool registration" do
     let(:greet_axn) do
       Class.new do
@@ -208,13 +195,12 @@ RSpec.describe "MCP Server Integration", type: :integration do
   end
 
   describe "unserializable exposed value" do
-    # axn #206 (PRO-2988): serialization now RAISES (Axn::Extensions::Serialization::UnserializableValue, an
-    # ArgumentError) rather than emitting a lossy/malformed body — here two Hash keys (:id and
-    # "id") stringify to the same JSON property and would silently collapse. Unlike an exception
-    # *inside* #call (which axn catches into a failed Result — see "exception handling" above), this
-    # raise happens during serialization *after* the Axn ran, outside axn's rescue, so it propagates
-    # to MCP::Server, which converts it into a JSON-RPC internal error. The point of this spec: the
-    # raise surfaces as the transport's error shape, not an escaped exception and not a dropped value.
+    # axn #206 (PRO-2988): serialization RAISES (Axn::Extensions::Serialization::UnserializableValue)
+    # rather than emitting a lossy/malformed body — here two Hash keys (:id and "id") stringify to the
+    # same JSON property and would silently collapse. That raise happens *after* the Axn succeeded, in
+    # the transport layer; Axn::MCP's Invocation guard catches it (reports via on_exception, returns an
+    # error response), so wrap's `.call` never escapes an exception. The point of this spec: it surfaces
+    # as an isError tool result, not an escaped exception and not a silently-dropped value.
     let(:unserializable_axn) do
       Class.new do
         include Axn
@@ -232,12 +218,16 @@ RSpec.describe "MCP Server Integration", type: :integration do
 
     let(:tools) { [Axn::MCP.wrap(unserializable_axn)] }
 
-    it "surfaces the raise as an error (either mcp shape), never an escape or a lossy success" do
+    it "returns an isError tool result (not an escape, not a lossy success)" do
       request = json_rpc_request("tools/call", { name: "dup_key_tool", arguments: {} })
       response = parse_response(server.handle_json(request))
 
-      expect(surfaced_failure?(response)).to be(true) # not a silently-lossy success result
-      expect(surfaced_error_text(response).to_s).to include("dup_key_tool")
+      # Axn::MCP catches the serialization raise before it reaches MCP::Server, so the shape is
+      # deterministic across the supported mcp range: a tool result flagged isError, carrying the
+      # generic client-facing message (the offending-value detail goes to on_exception, not here).
+      result = response[:result]
+      expect(result[:isError]).to be true
+      expect(result[:content].first[:text]).to eq("The tool could not produce a valid response")
     end
   end
 
@@ -245,8 +235,8 @@ RSpec.describe "MCP Server Integration", type: :integration do
     # axn #206 draws a line: serialization guarantees encodable *values*, but deliberately does
     # NOT own nesting depth — max_nesting (100 by default) is the encoder's option, not core's. So a
     # >100-deep (otherwise fine) structure passes serialization and then makes JSON.generate raise
-    # JSON::NestingError. We keep no local rescue around JSON.generate; MCP::Server's own rescue maps
-    # it to the same JSON-RPC error shape, so it still degrades gracefully instead of escaping.
+    # JSON::NestingError — which the Invocation guard catches like any other transport-layer raise,
+    # reporting via on_exception and returning an error response instead of escaping.
     let(:deep_axn) do
       Class.new do
         include Axn
@@ -272,11 +262,13 @@ RSpec.describe "MCP Server Integration", type: :integration do
 
     let(:tools) { [Axn::MCP.wrap(deep_axn)] }
 
-    it "surfaces the encode failure as an error (either mcp shape) rather than escaping (max_nesting is the encoder's, not core's)" do
+    it "returns an isError tool result rather than escaping (max_nesting is the encoder's, not core's)" do
       request = json_rpc_request("tools/call", { name: "deep_tool", arguments: {} })
       response = parse_response(server.handle_json(request))
 
-      expect(surfaced_failure?(response)).to be(true)
+      result = response[:result]
+      expect(result[:isError]).to be true
+      expect(result[:content].first[:text]).to eq("The tool could not produce a valid response")
     end
   end
 

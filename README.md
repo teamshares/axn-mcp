@@ -91,6 +91,18 @@ GreetUser.call(name: "Alice")                                    # => Axn::Resul
 The generated subclass's `.call` **always** returns `MCP::Tool::Response`, and it has no `.call!` —
 if you want raise-on-failure semantics, call the original Axn's `.call!` directly (unwrapped).
 
+#### Never-raises contract
+
+`.call` extends axn's non-bang "never raises" contract to the transport boundary. A tool's own
+failures come back as an error `MCP::Tool::Response` (axn already catches exceptions *inside* the
+action into a failed `Axn::Result` — see [Error Handling](#error-handling)). And if the transport
+layer *around* the action raises — exposed-value serialization hitting a value with no honest JSON
+form, a structure past JSON's `max_nesting`, or a bug — the wrapper catches that too: it reports the
+exception through axn's global `on_exception` hook (so it's never silent) and returns a generic
+error response, rather than letting an exception escape `.call` on a direct or custom transport.
+The one exception is axn's dev mode (`Axn.config.best_effort_raises_in_dev` in `development`): there
+it re-raises instead, so a real bug surfaces loudly rather than being masked.
+
 ### Every registered tool: `Axn::MCP.tools`
 
 Mark an Axn as an MCP tool with `tool :mcp` (axn core's tool-registry DSL), and `Axn::MCP.tools`
@@ -627,7 +639,7 @@ When a successful result's `exposes` values are serialized into the response, mo
 `reject_opaque_exposed_values` decides what happens when that occurs:
 
 - **`false` (default)** — the opaque rendering ships. For an LLM tool result an ugly-but-honest string is usually better than a failed call, so this is the default.
-- **`true`** — serialization raises `Axn::Extensions::Serialization::UnserializableValue` (naming the exact path, e.g. `records[3].owner`), which surfaces as the tool's error response instead of shipping the blob. Use it when a leaked `#<…>` string in a result is worse than a failure.
+- **`true`** — the value is rejected: instead of shipping the blob, the call returns an error response and reports the failure via axn's `on_exception` (with the exact path, e.g. `records[3].owner`, for your logs/error tracker). Use it when a leaked `#<…>` string in a result is worse than a failed call. (See [Never-raises contract](#never-raises-contract) for how the raise becomes an error response.)
 
 Set it **gem-wide** (`Axn::MCP.config.reject_opaque_exposed_values = true`) or **per tool** via `configure(:mcp)`; the per-class value wins over the gem-wide one.
 
@@ -640,7 +652,7 @@ class ListOwners
 end
 ```
 
-**Scope — this is an output-side check only.** It governs `exposes` serialization, *not* inbound argument handling (that's [`coerce:`](#coercing-loosely-typed-inbound-values-with-coerce)). And it is *narrow*: it toggles only the extra "was this rendering author-declared?" test. Values with no **honest** JSON form at all — a reference cycle, a non-finite `Float` (`Infinity`/`NaN`), bytes with no UTF-8 rendering, or two `Hash` keys that collapse to one property — always raise `Axn::Extensions::Serialization::UnserializableValue` regardless of this setting, because shipping them would produce a wrong or malformed body. `reject_opaque_exposed_values` only additionally rejects the *honest-but-undeclared* rendering above.
+**Scope — this is an output-side check only.** It governs `exposes` serialization, *not* inbound argument handling (that's [`coerce:`](#coercing-loosely-typed-inbound-values-with-coerce)). And it is *narrow*: it toggles only the extra "was this rendering author-declared?" test. Values with no **honest** JSON form at all — a reference cycle, a non-finite `Float` (`Infinity`/`NaN`), bytes with no UTF-8 rendering, or two `Hash` keys that collapse to one property — always fail the call regardless of this setting (surfaced the same way: an error response + an `on_exception` report), because shipping them would produce a wrong or malformed body. `reject_opaque_exposed_values` only additionally rejects the *honest-but-undeclared* rendering above.
 
 ## Integration with MCP Server
 

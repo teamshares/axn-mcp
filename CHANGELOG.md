@@ -39,11 +39,16 @@ reflection rather than gem code.
   always carries the exposed data regardless.
 - `reject_opaque_exposed_values` (boolean, default `false`) — when an `exposes` value has no JSON
   rendering its author declared (it would ship as `"#<User:0x…>"`, or an ActiveSupport
-  instance-variable dump under Rails), `true` fails the call with `Axn::Extensions::Serialization::UnserializableValue`
-  (surfaced as the tool's error response) instead of shipping that blob. Settable gem-wide
-  (`Axn::MCP.config.reject_opaque_exposed_values`) or per-class (`configure(:mcp)`), per-class wins.
-  Output-side only (not inbound `coerce:`), and narrow — values with no *honest* JSON form (cycles,
-  non-finite Floats, non-UTF-8 bytes, colliding Hash keys) raise regardless (axn #206 / PRO-2988).
+  instance-variable dump under Rails), `true` fails the call (error response + `on_exception` report)
+  instead of shipping that blob. Settable gem-wide (`Axn::MCP.config.reject_opaque_exposed_values`)
+  or per-class (`configure(:mcp)`), per-class wins. Output-side only (not inbound `coerce:`), and
+  narrow — values with no *honest* JSON form (cycles, non-finite Floats, non-UTF-8 bytes, colliding
+  Hash keys) fail regardless (axn #206 / PRO-2988).
+- **`Axn::MCP.wrap(...).call` never raises** — it extends axn's non-bang contract to the transport
+  boundary. A transport-layer exception raised *after* the Axn settled (exposed-value serialization,
+  response building) is reported via axn's global `on_exception` hook and returned as a generic error
+  `MCP::Tool::Response`, rather than escaping to a direct/custom caller. In axn's dev mode
+  (`best_effort_raises_in_dev`) it re-raises instead, so real bugs aren't masked.
 - `open_world` / `closed_world` registered as MCP-only `semantic_hints`. A class's `semantic_hints`
   (`:read_only` / `:idempotent` / `:destructive` / `:open_world` / `:closed_world`) drive its MCP
   annotations by default; an explicit `annotations:` on `wrap` always wins.

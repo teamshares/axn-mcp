@@ -38,13 +38,14 @@ module Axn
 
     # When true, serializing a successful result's `exposes` values rejects any value that has no
     # JSON rendering its author declared -- one that would otherwise ship as an opaque blob like
-    # `"#<User:0x...>"` (or, in Rails, ActiveSupport's generic instance-variable dump) -- by raising
-    # `Axn::Extensions::Serialization::UnserializableValue`, which surfaces as the tool's error response. Default
-    # `false`: for an LLM tool result an ugly-but-honest string usually beats a failed call, so the
-    # opaque rendering ships. Applies ONLY to outbound `exposes` serialization, not to inbound
-    # argument handling. (Values with no *honest* JSON form -- cycles, non-finite Floats,
-    # non-UTF-8-encodable bytes, colliding Hash keys -- raise regardless of this flag; it governs only
-    # the extra "was this rendering author-declared?" check.)
+    # `"#<User:0x...>"` (or, in Rails, ActiveSupport's generic instance-variable dump). The rejection
+    # raises during serialization; Invocation's guard turns that into an error response (and pages
+    # `on_exception`), so the tool call fails cleanly rather than shipping the blob. Default `false`:
+    # for an LLM tool result an ugly-but-honest string usually beats a failed call, so the opaque
+    # rendering ships. Applies ONLY to outbound `exposes` serialization, not to inbound argument
+    # handling. (Values with no *honest* JSON form -- cycles, non-finite Floats, non-UTF-8-encodable
+    # bytes, colliding Hash keys -- fail regardless of this flag; it governs only the extra "was this
+    # rendering author-declared?" check.)
     setting :reject_opaque_exposed_values, default: false, one_of: [true, false], overridable: true
 
     # Per-tool MCP metadata, declarable on the class via `configure(:mcp) { |c| c.title = "..." }`
