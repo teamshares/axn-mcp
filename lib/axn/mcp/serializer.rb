@@ -8,46 +8,28 @@ module Axn
     module Serializer
       module_function
 
-      def serialize_exposed(result, field_configs)
-        field_configs.each_with_object({}) do |config, hash|
-          value = result.public_send(config.field)
-          hash[config.field.to_s] = serialize_value(value)
-        end
-      end
+      # Client-facing text when the transport layer raises while turning a *successful* result into a
+      # response (serialization, response-building — see Invocation.perform's guard). Deliberately
+      # generic: the actionable detail is a gem/tool bug, so it rides on the reported exception (logs
+      # / on_exception), not the tool's response — mirroring how axn keeps a failure's detail off the
+      # user-facing message.
+      ADAPTER_FAILURE_MESSAGE = "The tool could not produce a valid response"
 
-      def serialize_value(value)
-        case value
-        when nil, String, Integer, Float, TrueClass, FalseClass
-          value
-        when Hash
-          value.transform_keys(&:to_s).transform_values { |v| serialize_value(v) }
-        when Array
-          value.map { |v| serialize_value(v) }
-        else
-          if value.respond_to?(:as_json)
-            value.as_json
-          elsif value.respond_to?(:to_h)
-            serialize_value(value.to_h)
-          else
-            value.to_s
-          end
-        end
-      end
-
-      def result_to_mcp_response(result, field_configs, text_content: :structured)
+      def result_to_mcp_response(result, text_content: :structured, reject_opaque_exposed_values: false)
         if result.ok?
-          exposed = serialize_exposed(result, field_configs)
+          exposed = Axn::Extensions::Serialization.render(result, reject_opaque: reject_opaque_exposed_values)
           success_text = success_response_text(result, exposed, text_content)
           ::MCP::Tool::Response.new(
             [{ type: "text", text: success_text }],
             structured_content: exposed.presence,
           )
         else
-          ::MCP::Tool::Response.new(
-            [{ type: "text", text: result.error }],
-            error: true,
-          )
+          error_response(result.error)
         end
+      end
+
+      def error_response(text)
+        ::MCP::Tool::Response.new([{ type: "text", text: }], error: true)
       end
 
       def success_response_text(result, exposed, text_content)
