@@ -192,7 +192,7 @@ MCP::Server.new(
   tools: [
     *Axn::MCP.tools,                                   # every registered :mcp Axn, wrapped
     NativeSearchTool,                                  # a plain MCP::Tool subclass
-    MCP::Tool.define(name: "ping", description: "…") { |_args, _sc| MCP::Tool::Response.new([...]) },
+    MCP::Tool.define(name: "ping", description: "…") { |server_context:, **_args| MCP::Tool::Response.new([...]) },
   ],
 )
 ```
@@ -686,8 +686,7 @@ because an Axn's model is typed structured I/O:
 
 - Ruby >= 3.2.1
 - [axn](https://github.com/teamshares/axn) >= 0.1.0-alpha.5, < 0.2.0
-- [mcp](https://github.com/modelcontextprotocol/ruby-sdk) >= 0.4, < 2.0 — this range spans versions with
-  meaningfully different `server_context` shapes at the transport layer (see [Server Context](#server-context)); this gem is written to be correct across all of it, not just the version you happen to have installed locally. The upper bound tracks the SDK's own semver: `1.0` declared its public API stable (breaking changes only in a future major), so `1.x` is in range.
+- [mcp](https://github.com/modelcontextprotocol/ruby-sdk) >= 0.5.0, < 2.0 — the floor is `0.5.0`, the first SDK version with the `icons` setter (and full JSON-Schema tool-schema handling, so conditional `allOf` constraints survive). Across that range the SDK varies in `server_context` shape (see [Server Context](#server-context)) and in how it surfaces a mid-serialization raise (a top-level JSON-RPC error vs. an `isError` tool result); this gem is written to be correct across all of it, not just the version you happen to have installed locally. The upper bound tracks the SDK's own semver: `1.0` declared its public API stable (breaking changes only in a future major), so `1.x` is in range.
 
 ## Development
 

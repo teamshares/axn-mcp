@@ -26,6 +26,19 @@ RSpec.describe "MCP Server Integration", type: :integration do
     JSON.parse(json, symbolize_names: true)
   end
 
+  # A raise that happens mid-serialization (after the Axn ran) is caught by MCP::Server, but the
+  # SUPPORTED mcp range surfaces it two ways: a top-level JSON-RPC error object (mcp >= ~1.0) or a
+  # tool result with `isError: true` (older). Both satisfy the invariant these specs care about —
+  # the raise is caught and surfaced, never escaped and never dropped as a clean success. Assert the
+  # invariant, not one version's shape.
+  def surfaced_failure?(response)
+    response.key?(:error) || response.dig(:result, :isError) == true
+  end
+
+  def surfaced_error_text(response)
+    response.dig(:error, :data) || response.dig(:error, :message) || response.dig(:result, :content, 0, :text)
+  end
+
   describe "tool registration" do
     let(:greet_axn) do
       Class.new do
@@ -219,13 +232,12 @@ RSpec.describe "MCP Server Integration", type: :integration do
 
     let(:tools) { [Axn::MCP.wrap(unserializable_axn)] }
 
-    it "surfaces a JSON-RPC error response, not an unhandled exception or a lossy result" do
+    it "surfaces the raise as an error (either mcp shape), never an escape or a lossy success" do
       request = json_rpc_request("tools/call", { name: "dup_key_tool", arguments: {} })
       response = parse_response(server.handle_json(request))
 
-      expect(response).not_to have_key(:result) # not a (silently lossy) tool result
-      expect(response[:error][:code]).to eq(-32_603) # JSON-RPC internal error
-      expect(response[:error][:data]).to include("Internal error calling tool dup_key_tool")
+      expect(surfaced_failure?(response)).to be(true) # not a silently-lossy success result
+      expect(surfaced_error_text(response).to_s).to include("dup_key_tool")
     end
   end
 
@@ -260,12 +272,11 @@ RSpec.describe "MCP Server Integration", type: :integration do
 
     let(:tools) { [Axn::MCP.wrap(deep_axn)] }
 
-    it "surfaces a JSON-RPC error response rather than escaping (max_nesting is the encoder's, not core's)" do
+    it "surfaces the encode failure as an error (either mcp shape) rather than escaping (max_nesting is the encoder's, not core's)" do
       request = json_rpc_request("tools/call", { name: "deep_tool", arguments: {} })
       response = parse_response(server.handle_json(request))
 
-      expect(response).not_to have_key(:result)
-      expect(response[:error][:code]).to eq(-32_603)
+      expect(surfaced_failure?(response)).to be(true)
     end
   end
 
