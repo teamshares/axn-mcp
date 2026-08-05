@@ -685,7 +685,7 @@ because an Axn's model is typed structured I/O:
 ## Requirements
 
 - Ruby >= 3.2.1
-- [axn](https://github.com/teamshares/axn) >= 0.1.0-alpha.4.3, < 0.2.0
+- [axn](https://github.com/teamshares/axn) >= 0.1.0-alpha.5, < 0.2.0
 - [mcp](https://github.com/modelcontextprotocol/ruby-sdk) >= 0.4, < 2.0 — this range spans versions with
   meaningfully different `server_context` shapes at the transport layer (see [Server Context](#server-context)); this gem is written to be correct across all of it, not just the version you happen to have installed locally. The upper bound tracks the SDK's own semver: `1.0` declared its public API stable (breaking changes only in a future major), so `1.x` is in range.
 

@@ -26,9 +26,10 @@ Schemas come from axn core reflection (`axn_class.input_schema`/`output_schema`)
   `spec/integration/server_integration_spec.rb`).
 - Before touching `fail!`/`error`/`exposes`/`expects`: read axn's `AGENTS-consuming.md`
   (`bundle show axn`) — covers `call`/`call!`, failure buckets, `standalone:`/`join:` prefixing.
-- Bumping the `axn` dependency: check its CHANGELOG/PRs for message-presentation shape changes
-  before trusting existing specs still assert the right strings. `Gemfile.lock` is gitignored; the
-  gem tracks axn `main` via `Gemfile`, `bundle update axn` to advance.
+- Bumping the `axn` dependency: raise the gemspec constraint, and check axn's CHANGELOG/PRs for
+  message-presentation shape changes before trusting existing specs still assert the right strings.
+  axn resolves from RubyGems via the gemspec dependency (no git source); `Gemfile.lock` is gitignored,
+  `bundle update axn` to advance.
 - `bundle exec rspec` + `bundle exec rubocop`. TDD: failing spec first.
 - `bin/setup` installs a lefthook pre-commit hook (`lefthook.yml`) that runs RuboCop **check-only**
   on staged `*.{rb,rake,gemspec}` and BLOCKS on any offense — fix and re-stage, it does not

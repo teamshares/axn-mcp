@@ -134,9 +134,10 @@ reflection rather than gem code.
 
 ### Dependency
 
-- Tracks `axn` git `main` (`github: "teamshares/axn", branch: "main"`) — this release needs recent
-  axn core reflection, tool-registry, and namespaced-config primitives that have no tagged axn
-  release yet. `Gemfile.lock` is gitignored; `bundle update axn` to advance.
+- Requires `axn >= 0.1.0-alpha.5, < 0.2.0` from RubyGems. This release needs axn core's reflection,
+  tool-registry, serialization-facade, and namespaced-config primitives, first available in the
+  `alpha.5` prerelease. (During development this gem tracked axn `main` from git; now that `alpha.5`
+  is published it depends on the released gem.)
 - Widened the `mcp` requirement to `>= 0.4, < 2.0` (was `< 1.0`). `mcp` 1.0 is a stability
   declaration over 0.25 (docs only — no code changes to the tool-definition, response, schema, or
   `ServerContext` surfaces this gem uses) and commits the SDK to semver, so the whole `1.x` line is
