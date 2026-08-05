@@ -17,7 +17,7 @@ reflection rather than gem code.
   `semantic_hints` unless an explicit `annotations:` is passed. Raises if a truly anonymous Axn (no
   class name, no `axn_name`) is wrapped without `name:`.
 - `Axn::MCP.tools` — zero-arg convenience returning every Axn registered as a `:mcp` tool (via
-  `tool :mcp`, a `configure(:mcp)` bag, or residency under a configured `tool_path`), each already
+  `tool :mcp`, a `configure(:mcp)` bag, or residency under a configured `tool_roots` directory), each already
   wrapped and deterministically ordered by `tool_name`. `MCP::Server.new(tools: Axn::MCP.tools)`.
   Symmetric with `Axn::RubyLLM.tools`.
 - Registers `:mcp` as a tool adapter with axn core's process-global registry, passing `Axn::MCP`

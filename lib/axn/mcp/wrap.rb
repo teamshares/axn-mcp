@@ -17,6 +17,13 @@ module Axn
       # semantics can call the original wrapped class's own .call! directly (unwrapped).
       VALID_PRESENT_AS = %i[structured message].freeze
 
+      # `server_context` is the input name the wrapper reserves for the injected MCP context
+      # (Invocation strips it before calling the Axn), so a wrapped Axn must not declare it as a
+      # top-level `expects`. (`ambient_context`, the other stripped key, needs no entry here: axn core
+      # already reserves it and rejects `expects :ambient_context` at declaration.)
+      RESERVED_INPUT_FIELDS = %i[server_context].freeze
+      private_constant :RESERVED_INPUT_FIELDS
+
       # Sentinel for the retired `mcp_text_content:` kwarg (renamed to `present_as:`, PRO-2923), so a
       # caller still passing it gets a pointed migration error instead of silently having it ignored.
       RENAMED_MCP_TEXT_CONTENT = Object.new.freeze
@@ -36,6 +43,7 @@ module Axn
                present_as: nil, mcp_text_content: RENAMED_MCP_TEXT_CONTENT)
         reject_renamed_mcp_text_content!(mcp_text_content)
         validate_present_as!(present_as)
+        reject_reserved_input_fields!(axn_class)
         resolved_name = resolve_wrap_tool_name(axn_class, name)
         resolved_description = description || axn_class.description
 
@@ -117,6 +125,24 @@ module Axn
         return if present_as.nil? || VALID_PRESENT_AS.include?(present_as)
 
         raise ArgumentError, "present_as must be one of #{VALID_PRESENT_AS.map(&:inspect).join(", ")}; got #{present_as.inspect}"
+      end
+
+      # `server_context` is reserved: Invocation injects the MCP server context under that key and
+      # strips it before calling the Axn (see Invocation.perform). A wrapped Axn declaring it as a
+      # normal TOP-LEVEL `expects` (so it surfaces in `input_schema`, unlike an `on: :ambient_context`
+      # field, which is excluded) would advertise it as a client argument yet never receive it -- a
+      # schema-valid call would then fail the Axn's own validation. Reject at wrap time rather than ship
+      # that contradiction; the data an Axn needs from the context goes on `ambient_context`
+      # (`expects :user_id, on: :ambient_context`).
+      def reject_reserved_input_fields!(axn_class)
+        reserved = RESERVED_INPUT_FIELDS & (axn_class.input_schema[:properties] || {}).keys.map(&:to_sym)
+        return if reserved.empty?
+
+        raise ArgumentError,
+              "Axn::MCP.wrap can't expose #{axn_class}: #{reserved.map(&:inspect).join(", ")} " \
+              "#{reserved.one? ? "is a reserved top-level input name" : "are reserved top-level input names"} " \
+              "(the wrapper injects the MCP server context there). Declare the data the Axn needs on " \
+              "`ambient_context` instead, e.g. `expects :user_id, on: :ambient_context`."
       end
 
       # Resolve the provider-facing tool name. An explicit `name:` kwarg (most local to the call

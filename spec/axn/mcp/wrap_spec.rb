@@ -122,6 +122,44 @@ RSpec.describe "Axn::MCP.wrap" do
     end
   end
 
+  describe "reserved input fields" do
+    it "raises rather than wrap an Axn declaring a top-level `expects :server_context` (reserved for injected context)" do
+      axn = Class.new do
+        include Axn
+
+        def self.name = "ReservedFieldAxn"
+        expects :server_context, type: String
+      end
+
+      expect { Axn::MCP.wrap(axn) }
+        .to raise_error(ArgumentError, /server_context.*reserved.*ambient_context/m)
+    end
+
+    it "relies on axn core to reject the other stripped key, `ambient_context`, at declaration time" do
+      # No wrap-time check needed for ambient_context: core reserves it, so the class never defines.
+      expect do
+        Class.new do
+          include Axn
+
+          expects :ambient_context, type: String
+        end
+      end.to raise_error(Axn::ContractViolation::ReservedAttributeError, /ambient_context/)
+    end
+
+    it "still allows the supported `on: :ambient_context` form (excluded from inputSchema, not a collision)" do
+      axn = Class.new do
+        include Axn
+
+        def self.name = "AmbientOkAxn"
+        expects :user_id, on: :ambient_context, type: Object, optional: true
+        exposes :x, type: String
+        def call = expose(x: "y")
+      end
+
+      expect { Axn::MCP.wrap(axn) }.not_to raise_error
+    end
+  end
+
   it "sets title/icons/meta from the wrap kwargs, mirroring annotations:" do
     tool = Axn::MCP.wrap(
       plain_axn,
