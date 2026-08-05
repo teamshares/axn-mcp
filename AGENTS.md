@@ -30,7 +30,9 @@ Schemas come from axn core reflection (`axn_class.input_schema`/`output_schema`)
   message-presentation shape changes before trusting existing specs still assert the right strings.
   axn resolves from RubyGems via the gemspec dependency (no git source); `Gemfile.lock` is gitignored,
   `bundle update axn` to advance.
-- `bundle exec rspec` + `bundle exec rubocop`. TDD: failing spec first.
+- `bundle exec rspec` + `bundle exec rubocop`. TDD: failing spec first. `rake verify` (= bare `rake`)
+  runs both; `rake release` is gated on it (specs + RuboCop must pass before any tag/push), mirroring
+  axn core.
 - `bin/setup` installs a lefthook pre-commit hook (`lefthook.yml`) that runs RuboCop **check-only**
   on staged `*.{rb,rake,gemspec}` and BLOCKS on any offense — fix and re-stage, it does not
   autocorrect. Skip once with `git commit --no-verify`; CI runs the full `rake` regardless.

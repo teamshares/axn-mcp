@@ -8,6 +8,13 @@ RSpec::Core::RakeTask.new(:spec)
 
 RuboCop::RakeTask.new
 
-task default: %i[spec rubocop]
+desc "Run all checks (specs + RuboCop) — the release gate"
+task verify: %i[spec rubocop]
 
-Rake::Task["build"].enhance([:default])
+task default: :verify
+
+# Gate `rake release` on `verify`, the same way axn core does. bundler/gem_tasks' `release` task
+# depends on `build`, so enhancing `build` with `verify` runs specs + RuboCop before the gem is even
+# built — and therefore before the tag / RubyGems push steps. A failing check aborts the release
+# before anything is tagged or pushed.
+Rake::Task["build"].enhance([:verify])
