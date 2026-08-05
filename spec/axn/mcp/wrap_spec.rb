@@ -114,6 +114,12 @@ RSpec.describe "Axn::MCP.wrap" do
       expect(annotations.destructive_hint).to be true
       expect(annotations.read_only_hint).to be_falsey # explicit hash replaces the hint-derived set wholesale
     end
+
+    it "leaves annotations unset for an explicit empty override (suppresses hints; no SDK defaults leak)" do
+      # `annotations: {}` clears the semantic-hint-derived set. The setter is skipped entirely, so the
+      # tool advertises NO annotations -- not MCP::Tool::Annotations' defaults (destructiveHint: true …).
+      expect(wrap_with_hints(:read_only, :destructive, annotations: {}).annotations_value).to be_nil
+    end
   end
 
   it "sets title/icons/meta from the wrap kwargs, mirroring annotations:" do

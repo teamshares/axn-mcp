@@ -70,7 +70,11 @@ module Axn
 
           hint_annotations = Axn::MCP::Annotations.annotations_for(axn_class._semantic_hints)
           resolved_annotations = configured_annotations || (hint_annotations if hint_annotations.any?)
-          self.annotations(**resolved_annotations) if resolved_annotations
+          # Skip the setter for an EMPTY hash, not just nil: `annotations: {}` (or a `configure(:mcp)`
+          # empty override) is how a caller suppresses the semantic-hint-derived annotations, and
+          # `MCP::Tool.annotations()` with no kwargs would instead advertise the SDK's own defaults
+          # (destructiveHint: true, openWorldHint: true, ...) -- the opposite of what they asked for.
+          self.annotations(**resolved_annotations) if resolved_annotations.present?
 
           define_singleton_method(:call) do |**kwargs|
             # Resolved fresh on every call, not captured once at wrap-time, so a gem-wide config

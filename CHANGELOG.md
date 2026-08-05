@@ -143,10 +143,10 @@ reflection rather than gem code.
   tool-registry, serialization-facade, and namespaced-config primitives, first available in the
   `alpha.5` prerelease. (During development this gem tracked axn `main` from git; now that `alpha.5`
   is published it depends on the released gem.)
-- Widened the `mcp` requirement to `>= 0.4, < 2.0` (was `< 1.0`). `mcp` 1.0 is a stability
-  declaration over 0.25 (docs only — no code changes to the tool-definition, response, schema, or
-  `ServerContext` surfaces this gem uses) and commits the SDK to semver, so the whole `1.x` line is
-  supported. Verified against `mcp` 1.0.0.
+- Set the `mcp` requirement to `>= 0.5.0, < 2.0`. Floor is `0.5.0` — the first SDK with the `icons`
+  setter and full JSON-Schema tool schemas (so conditional `allOf` survives); `0.4.x` lacks both.
+  Upper bound tracks the SDK's semver: `1.0` declared its API stable (breaking only in a future
+  major), so the whole `1.x` line is supported. Verified against `mcp` 0.5.0 and 1.1.0.
 
 ## 0.1.0
 
