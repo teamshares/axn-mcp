@@ -53,7 +53,13 @@ module Axn
         begin
           Serializer.result_to_mcp_response(result, text_content:, reject_opaque_exposed_values:)
         rescue StandardError => e
-          Axn.config.on_exception(e, action: axn_class, context: { source: "Axn::MCP" })
+          # Report best-effort: a broken `on_exception` reporter must not itself break this guard's
+          # own never-raises contract on the very path it exists to normalize (mirrors how core wraps
+          # its own on_exception). best_effort swallows a reporter failure outside dev; in dev it, like
+          # the `raise` below, surfaces loudly.
+          Axn::Extensions.best_effort("Axn::MCP transport-failure report", action: axn_class) do
+            Axn.config.on_exception(e, action: axn_class, context: { source: "Axn::MCP" })
+          end
           raise if Axn::Extensions.raises_in_dev?
 
           Serializer.error_response(Serializer::ADAPTER_FAILURE_MESSAGE)

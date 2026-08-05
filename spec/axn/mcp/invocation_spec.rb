@@ -126,6 +126,14 @@ RSpec.describe Axn::MCP::Invocation do
           .to raise_error(Axn::Extensions::Serialization::UnserializableValue)
       end
 
+      it "still returns an error response when the on_exception reporter itself raises" do
+        allow(Axn.config).to receive(:on_exception).and_raise(RuntimeError, "reporter broken")
+
+        response = described_class.perform(dup_key_axn, {}, text_content: :structured)
+
+        expect(response.error?).to be true
+      end
+
       it "guards ANY StandardError from the transport step, not only serialization" do
         allow(Axn::MCP::Serializer).to receive(:result_to_mcp_response).and_raise(RuntimeError, "boom")
         captured = nil
