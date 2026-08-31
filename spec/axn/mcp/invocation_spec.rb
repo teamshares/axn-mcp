@@ -156,6 +156,11 @@ RSpec.describe Axn::MCP::Invocation do
           io.string
         end
 
+        # Asserts against the specific ERROR line the guard writes, not the whole captured buffer: the
+        # class also emits its own auto-log INFO lines (which correctly resolve a `.name` override
+        # through `resolved_axn_name`), and asserting against the full buffer would pass even if the
+        # hint itself renders the class as `#<Class:0x...>` -- exactly the interpolation bug this guards
+        # against (Class#to_s does not dispatch through an overridden `.name`).
         it "names the offending tool and BOTH config levels when reject_opaque_exposed_values is on" do
           opaque_axn = Class.new do
             include Axn
@@ -167,10 +172,11 @@ RSpec.describe Axn::MCP::Invocation do
           end
 
           line = captured_log_for(opaque_axn, reject_opaque_exposed_values: true)
+          hint_line = line.lines.find { |l| l.include?("[axn-mcp] failed to serialize") }
 
-          expect(line).to include("InvocationSpec::Opaque")
-          expect(line).to include("configure(:mcp)")
-          expect(line).to include("Axn::MCP.config.reject_opaque_exposed_values")
+          expect(hint_line).to include("InvocationSpec::Opaque")
+          expect(hint_line).to include("configure(:mcp)")
+          expect(hint_line).to include("Axn::MCP.config.reject_opaque_exposed_values")
         end
 
         it "omits the hint when reject_opaque_exposed_values is off (the rejection can't be opaque-related)" do
