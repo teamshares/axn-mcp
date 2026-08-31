@@ -76,7 +76,13 @@ module Axn
                  else
                    ""
                  end
-          Axn.config.logger.error { "[axn-mcp] failed to serialize successful result: #{e.class}: #{e.message}#{hint}" }
+          # A separate best_effort from the on_exception report above, deliberately: a broken configured
+          # logger must not suppress the on_exception report (which already ran), and a broken on_exception
+          # reporter must not suppress this diagnostic line either -- each is the guard's only surviving
+          # signal when the OTHER one is what's broken.
+          Axn::Extensions.best_effort("Axn::MCP transport-failure diagnostic log", action: axn_class) do
+            Axn.config.logger.error { "[axn-mcp] failed to serialize successful result: #{e.class}: #{e.message}#{hint}" }
+          end
 
           raise if Axn::Extensions.raises_in_dev?
 
