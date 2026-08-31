@@ -426,5 +426,20 @@ RSpec.describe "Axn::MCP.wrap" do
       expect(response.error?).to be false
       expect(response.structured_content["obj"]).to match(/\A#<Object:0x/)
     end
+
+    # `wrap`'s resolved MCP tool name (an explicit `name:`, or a per-adapter `tool mcp: { name: }`
+    # override) can differ from the wrapped Axn's own class name -- and it's the one an operator sees
+    # on the failed MCP request, so it's what the diagnostic hint should name, not the class.
+    it "names the diagnostic hint by the wrapper's resolved tool name, not the wrapped Axn's own name" do
+      io = StringIO.new
+      allow(Axn.config).to receive(:logger).and_return(Logger.new(io))
+      Axn::MCP.config.reject_opaque_exposed_values = true
+
+      Axn::MCP.wrap(opaque_axn, name: "lookup_customer").call(server_context: {})
+
+      hint_line = io.string.lines.find { |l| l.include?("[axn-mcp] failed to serialize") }
+      expect(hint_line).to include("lookup_customer")
+      expect(hint_line).not_to include("OpaqueExposer")
+    end
   end
 end

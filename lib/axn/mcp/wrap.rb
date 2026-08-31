@@ -97,7 +97,8 @@ module Axn
             Axn::MCP::Invocation.perform(
               axn_class, kwargs,
               text_content: present_as || Axn::MCP.resolve_override_for(axn_class, :present_as),
-              reject_opaque_exposed_values: Axn::MCP.resolve_override_for(axn_class, :reject_opaque_exposed_values)
+              reject_opaque_exposed_values: Axn::MCP.resolve_override_for(axn_class, :reject_opaque_exposed_values),
+              tool_name: resolved_name
             )
           end
         end
