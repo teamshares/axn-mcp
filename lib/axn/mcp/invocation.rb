@@ -17,7 +17,7 @@ module Axn
     module Invocation
       module_function
 
-      def perform(axn_class, kwargs, text_content:, reject_opaque_exposed_values: false)
+      def perform(axn_class, kwargs, text_content:, reject_opaque_exposed_values: false, tool_name: nil)
         # Prefer the Symbol key WHENEVER PRESENT (key?, not `||`/truthiness): an explicit
         # server_context: nil must win over a String-keyed value, or a caller could forge
         # server_context by appending an extra "server_context" argument alongside a real, explicit
@@ -70,19 +70,25 @@ module Axn
           # because reject_opaque_exposed_values being on doesn't mean THIS failure is an opaque
           # rejection -- it could equally be a colliding key, a non-finite Float, or a gem bug.
           #
-          # `resolved_axn_name` (axn core), not raw `#{axn_class}`: Class#to_s does NOT dispatch through
-          # an overridden `.name` (it renders the object-id form regardless), so a class with no assigned
-          # constant -- e.g. one built via Axn::Factory.build -- would otherwise show as `#<Class:0x...>`
-          # instead of naming the action. Built INSIDE the best_effort block, not before it: axn_class is
-          # caller code, so a hostile/buggy `resolved_axn_name` override must not raise outside the guard
+          # Named by the MCP-facing tool_name (from wrap's `resolved_name`), not the wrapped Axn's own
+          # class name: `Axn::MCP.wrap` lets the same Axn mount under a different name per call site
+          # (an explicit `name:`, or a per-adapter `tool mcp: { name: }` override), and an operator
+          # correlating this line with a failed MCP request has the REQUEST's tool name, not the class's.
+          # Falls back to `resolved_axn_name` (axn core) for a caller of `perform` outside `wrap` (the
+          # specs below) -- never raw `#{axn_class}`: Class#to_s does NOT dispatch through an overridden
+          # `.name` (it renders the object-id form regardless), so a class with no assigned constant --
+          # e.g. one built via Axn::Factory.build -- would otherwise show as `#<Class:0x...>` instead of
+          # naming the action. Built INSIDE the best_effort block, not before it: both tool_name and
+          # axn_class are caller-supplied, so a hostile/buggy override must not raise outside the guard
           # meant to contain exactly that. A separate best_effort from the on_exception report above,
           # deliberately: a broken configured logger must not suppress the on_exception report (which
           # already ran), and a broken on_exception reporter must not suppress this diagnostic line either
           # -- each is the guard's only surviving signal when the OTHER one is what's broken.
           Axn::Extensions.best_effort("Axn::MCP transport-failure diagnostic log", action: axn_class) do
             hint = if reject_opaque_exposed_values
+                     display_name = tool_name || axn_class.resolved_axn_name
                      " (if this is an opaque-value rejection: reject_opaque_exposed_values resolved true for " \
-                       "#{axn_class.resolved_axn_name} — unset it on the action via `configure(:mcp)`, or " \
+                       "#{display_name} — unset it on the action via `configure(:mcp)`, or " \
                        "gem-wide via `Axn::MCP.config.reject_opaque_exposed_values = false`, whichever is set)"
                    else
                      ""
