@@ -60,6 +60,24 @@ module Axn
           Axn::Extensions.best_effort("Axn::MCP transport-failure report", action: axn_class) do
             Axn.config.on_exception(e, action: axn_class, context: { source: "Axn::MCP" })
           end
+
+          # The user-facing response stays generic (ADAPTER_FAILURE_MESSAGE) -- this line is an
+          # operator's only pointer to WHY. Mirrors axn-openapi's dispatcher hint: the config pointer
+          # lives HERE rather than in core's exception message, since core raises the same error for
+          # adapters with no such setting. Named as BOTH config levels, never just the gem-wide setter
+          # -- the value is resolved per-tool, so a `configure(:mcp)` override beats `config`, and core
+          # exposes no way to ask which level supplied a resolved value. Non-committal ("if this is")
+          # because reject_opaque_exposed_values being on doesn't mean THIS failure is an opaque
+          # rejection -- it could equally be a colliding key, a non-finite Float, or a gem bug.
+          hint = if reject_opaque_exposed_values
+                   " (if this is an opaque-value rejection: reject_opaque_exposed_values resolved true for " \
+                     "#{axn_class} — unset it on the action via `configure(:mcp)`, or gem-wide via " \
+                     "`Axn::MCP.config.reject_opaque_exposed_values = false`, whichever is set)"
+                 else
+                   ""
+                 end
+          Axn.config.logger.error { "[axn-mcp] failed to serialize successful result: #{e.class}: #{e.message}#{hint}" }
+
           raise if Axn::Extensions.raises_in_dev?
 
           Serializer.error_response(Serializer::ADAPTER_FAILURE_MESSAGE)
