@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+### Internal
+
+- **[INTERNAL] Routed the adapter config/serialization plumbing through axn core's shared
+  `Axn::Tools::AdapterSerialization` (PRO-2996).** `Axn::MCP` now `extend`s the mixin alongside
+  `Axn::Tools::AdapterRoots`: `reject_opaque_exposed_values` is declared via
+  `declare_reject_opaque_exposed_values! default: false` (was a hand-written `setting`), `tool_roots`
+  via `tool_roots_default %w[agent_tools]` (was a re-declared `setting` hand-copying core's
+  validation lambda), exposed-value rendering goes through `Axn::MCP.serialize_exposed(result)`, and
+  the transport-mapping guard through `Axn::MCP.guard_tool_response`. **No behavior change** —
+  identical defaults, identical per-tool override precedence (`configure(:mcp)` beats the gem-wide
+  config), identical error response, `on_exception` report and dev re-raise, and an identical
+  operator hint line. Internally, `reject_opaque_exposed_values` is now resolved off the result's own
+  action class inside `serialize_exposed` rather than threaded through the call, so
+  `Axn::MCP::Serializer.result_to_mcp_response` and `Axn::MCP::Invocation.perform` no longer take a
+  `reject_opaque_exposed_values:` kwarg. Both are internal entry points (a consumer calls
+  `Axn::MCP.wrap`/`.tools`), so this is not a user-facing signature change.
+
 ### Fixed
 
 - **The transport-failure guard now logs an operator hint when `reject_opaque_exposed_values` may be the

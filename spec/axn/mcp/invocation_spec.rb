@@ -149,10 +149,16 @@ RSpec.describe Axn::MCP::Invocation do
       # axn-openapi's dispatcher hint spec: named because reject_opaque_exposed_values is overridable, so a
       # hint naming only the gem-wide setter is a dead end whenever a per-tool override is what's in effect.
       describe "the opaque-rejection log hint" do
+        # Set gem-wide rather than passed to `perform`: `reject_opaque_exposed_values` is no longer a
+        # kwarg anywhere on this path -- `Axn::MCP.serialize_exposed` resolves it per-tool, and the hint
+        # below re-resolves it the same way -- so config IS the only way to turn it on now.
+        after { Axn::MCP.reset_config! }
+
         def captured_log_for(axn_class, reject_opaque_exposed_values:)
+          Axn::MCP.config.reject_opaque_exposed_values = reject_opaque_exposed_values
           io = StringIO.new
           allow(Axn.config).to receive(:logger).and_return(Logger.new(io))
-          described_class.perform(axn_class, {}, text_content: :structured, reject_opaque_exposed_values:)
+          described_class.perform(axn_class, {}, text_content: :structured)
           io.string
         end
 

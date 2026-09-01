@@ -94,10 +94,14 @@ module Axn
             # Axn::MCP.overrides, so it may have no such method at all; resolve_override_for reads
             # the override store directly and falls back to the gem-wide config on its own, with no
             # dependency on axn_class having that accessor.
+            #
+            # `present_as` is the only setting resolved here now: `reject_opaque_exposed_values` is
+            # resolved inside `Axn::MCP.serialize_exposed` (core's Axn::Tools::AdapterSerialization),
+            # keyed off the result's own action class, so there is no longer a value to thread through
+            # the invocation -- and no way for a caller to thread the wrong one.
             Axn::MCP::Invocation.perform(
               axn_class, kwargs,
               text_content: present_as || Axn::MCP.resolve_override_for(axn_class, :present_as),
-              reject_opaque_exposed_values: Axn::MCP.resolve_override_for(axn_class, :reject_opaque_exposed_values),
               tool_name: resolved_name
             )
           end

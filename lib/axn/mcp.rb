@@ -13,6 +13,7 @@ module Axn
   module MCP
     extend Axn::Configurable
     extend Axn::Tools::AdapterRoots
+    extend Axn::Tools::AdapterSerialization
 
     config_namespace :mcp
 
@@ -29,10 +30,13 @@ module Axn
     # []); the registry reads `Axn::MCP.config.tool_roots` for directory-based tool membership.
     # Ship the shared `agent_tools` convention as the default root, so an Axn under `app/agent_tools/`
     # is exposed as an MCP tool out of the box (no explicit `tool :mcp` needed) -- and, since
-    # axn-ruby_llm defaults to the same dir, the same tool is exposed over ruby_llm too. Re-declaring
-    # the setting overrides AdapterRoots' empty default while reusing its broad-path validation
-    # (which rejects widening a root to `app/`/`.`/`actions`/a `..` traversal).
-    setting :tool_roots, default: %w[agent_tools], validate: ->(value) { Axn::Tools::AdapterRoots.validate!(value) }
+    # axn-ruby_llm defaults to the same dir, the same tool is exposed over ruby_llm too.
+    # `tool_roots_default` re-declares the setting through core's own `setting` path -- overriding
+    # AdapterRoots' empty default while reusing its broad-path validation (which rejects widening a
+    # root to `app/`/`.`/`actions`/a `..` traversal), and validating EAGERLY here rather than at the
+    # registry's first read -- so an app's own assignment still wins and `config.reset!(:tool_roots)`
+    # returns to this default rather than core's `[]`.
+    tool_roots_default %w[agent_tools]
 
     setting :present_as, default: :structured, one_of: %i[structured message], overridable: true
 
@@ -46,7 +50,7 @@ module Axn
     # handling. (Values with no *honest* JSON form -- cycles, non-finite Floats, non-UTF-8-encodable
     # bytes, colliding Hash keys -- fail regardless of this flag; it governs only the extra "was this
     # rendering author-declared?" check.)
-    setting :reject_opaque_exposed_values, default: false, one_of: [true, false], overridable: true
+    declare_reject_opaque_exposed_values! default: false
 
     # Per-tool MCP metadata, declarable on the class via `configure(:mcp) { |c| c.title = "..." }`
     # so it survives the zero-arg `Axn::MCP.tools` path (which calls `wrap` with no kwargs). Each
