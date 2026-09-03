@@ -2,7 +2,7 @@
 
 module Axn
   module MCP
-    # Shared "server_context: -> ambient_context: -> call -> MCP::Tool::Response" path used by
+    # Shared "server_context: -> ambient_context: -> Invoker#call -> MCP::Tool::Response" path used by
     # Axn::MCP.wrap-generated classes (PRO-2844). The injected server_context is passed *as* the
     # Axn's ambient_context (spread, not nested under a `server_context` key), so a wrapped Axn
     # declares the data it needs generically -- `expects :user_id, on: :ambient_context` -- and stays
@@ -35,8 +35,26 @@ module Axn
         # (last-write-wins on the collision), so `.except` with Symbol keys alone doesn't catch it.
         rest = kwargs.reject { |k, _| %w[server_context ambient_context].include?(k.to_s) }
 
+        # The sanctioned tool call path (axn core's Axn::Tools::Invoker, PRO-2943/PRO-3332), not a
+        # bare `axn_class.call` -- args here are untrusted, model-supplied wire data, and the Invoker
+        # applies the tool contract a trusted in-process `.call` deliberately doesn't: always-on
+        # coercion of those wire args (a JSON-string "5" for an `expects :n, type: Integer` becomes
+        # the Integer), a user-facing "Invalid tool arguments" failure instead of an on_exception page
+        # for an inbound contract violation, and rejection of a top-level key the tool never declared
+        # (previously silently dropped by plain `**kwargs`). `adapter: :mcp` stamps every call this
+        # Invoker makes with the `invoked_via` dimension for its whole call tree (Datadog can then
+        # separate tool-driven traffic from ordinary direct calls) -- matches axn-ruby_llm's and
+        # axn-openapi's own `Invoker.new(user_facing_input_errors: true, reject_undeclared_inputs:
+        # true)` profile, the established contract for an LLM/model-facing tool adapter.
+        #
+        # `rest`/`server_context` here are unchanged from before this migration: the Invoker ALSO
+        # strips a model-supplied `ambient_context` key and merges in the trusted `ambient_context:`
+        # kwarg after that guard, so this file's own stripping above is now redundant with the
+        # Invoker's -- kept as-is rather than removed, since a caller-supplied `ambient_context` was
+        # already stripped from `rest` before it ever reaches here.
+        invoker = Axn::Tools::Invoker.new(adapter: :mcp, user_facing_input_errors: true, reject_undeclared_inputs: true)
         result = Axn::MCP.with_server_context(server_context) do
-          axn_class.call(ambient_context: server_context || {}, **rest)
+          invoker.call(axn_class, rest, ambient_context: server_context || {})
         end
 
         # Uphold axn's non-bang "never raises" contract at the adapter boundary. The wrapped Axn's own

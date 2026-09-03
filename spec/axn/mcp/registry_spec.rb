@@ -131,7 +131,7 @@ RSpec.describe "Axn::MCP tool-adapter registration" do
       end)
 
       listed = Axn::MCP.tools.find { |t| t.name_value == "configured_tools_tool" }
-      response = listed.call(greeting_ignored: nil, server_context: {})
+      response = listed.call(server_context: {})
 
       expect(response.content.first[:text]).to eq("Action completed successfully")
     end

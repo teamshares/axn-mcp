@@ -2,6 +2,36 @@
 
 ## Unreleased
 
+### Changed
+
+- **BREAKING (behavior): every MCP tool call now runs through axn core's `Axn::Tools::Invoker`
+  (PRO-2943/PRO-3332) instead of a bare `axn_class.call`, turning on three behaviors that were
+  previously off for every wrapped Axn — no opt-out.** This is the same profile `axn-ruby_llm` and
+  `axn-openapi` already use for a model/LLM-facing tool.
+  - **Input coercion is now always on.** A wire-typed argument (a JSON string `"25"` for an
+    `expects :limit, type: Integer`) is coerced to the declared type before the Axn runs — previously
+    only if the class or `Axn.config` opted into `coerce_input_types` itself. A field's own `coerce:`
+    still wins. If a tool's `expects` has no `type:` at all, this is a no-op for that field; declaring
+    `type:` on every tool input (which `input_schema` already needs to build the JSON Schema) is what
+    benefits from it. See axn core's [Tool Invoker](https://teamshares.github.io/axn/reference/tool-invoker) docs.
+  - **An inbound-contract violation (a bad or missing argument) now settles as a correctable,
+    user-facing tool error instead of a generic failure reported through `on_exception`.** Previously
+    a model sending a malformed argument reported as a dev-facing bug (paging `on_exception`, generic
+    error text) exactly like an internal error would. Now `result.error` names the specific violation
+    (e.g. which field), the call is **not** reported to `on_exception`, and the client gets an
+    actionable message instead of a wall.
+  - **A top-level tool argument the Axn never declared with `expects` is now rejected as invalid input,
+    instead of being silently dropped.** Previously an MCP client could pass an extra/misspelled
+    argument and it would just vanish (ordinary Ruby `**kwargs` behavior); now the call fails with a
+    message naming the undeclared key.
+  - Also stamps every wrapped call's tree with the `invoked_via: "mcp"` dimension (visible in axn's
+    own call-completion log line and any tracing/dashboard code keyed off it), so MCP-driven traffic
+    is now distinguishable from a direct `.call`. This part is additive/observability-only.
+  - **Unaffected:** `ambient_context` resolution/guarding (still adapter-injected, still stripped from
+    model-supplied args before this ever ran), the transport-failure guard and its diagnostic hint,
+    `present_as`, `reject_opaque_exposed_values`, and every other config/serialization behavior in
+    this release. Only the dispatch of `axn_class.call` itself changed.
+
 ### Internal
 
 - **[INTERNAL] Routed the adapter config/serialization plumbing through axn core's shared
