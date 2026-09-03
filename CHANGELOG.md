@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.2
 
 ### Changed
 
@@ -31,6 +31,9 @@
     model-supplied args before this ever ran), the transport-failure guard and its diagnostic hint,
     `present_as`, `reject_opaque_exposed_values`, and every other config/serialization behavior in
     this release. Only the dispatch of `axn_class.call` itself changed.
+
+- **Raised the `axn` dependency floor to `>= 0.1.0-alpha.6`** (from `>= 0.1.0-alpha.5`) — required for
+  both `Axn::Tools::AdapterSerialization` and `Axn::Tools::Invoker`'s `adapter:` kwarg, above.
 
 ### Internal
 
