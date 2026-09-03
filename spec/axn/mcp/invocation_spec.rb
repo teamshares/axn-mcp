@@ -123,7 +123,10 @@ RSpec.describe Axn::MCP::Invocation do
         response = described_class.perform(typed_axn, { n: "not-a-number", server_context: {} }, text_content: :structured)
 
         expect(response.error?).to be true
-        expect(response.content.first[:text]).to match(/n/i) # names the offending field, per axn's own composition
+        # Exact string, not a loose matcher: a broad /n/i (or similar) would also match the
+        # pre-migration generic "Something went wrong" response, so it wouldn't actually catch a
+        # regression back to that behavior. Per AGENTS.md: pin exact user-facing strings.
+        expect(response.content.first[:text]).to eq("N could not be coerced to a Integer")
         expect(reported).to be_empty # user-facing, per Invoker docs -- not paged as a dev-facing bug
       end
 
@@ -138,7 +141,7 @@ RSpec.describe Axn::MCP::Invocation do
         response = described_class.perform(no_input_axn, { unexpected: "value", server_context: {} }, text_content: :structured)
 
         expect(response.error?).to be true
-        expect(response.content.first[:text]).to match(/unexpected/i)
+        expect(response.content.first[:text]).to eq("unknown input: unexpected")
       end
 
       it "stamps the call tree with the :mcp invoked_via dimension (adapter: :mcp)" do
