@@ -15,9 +15,13 @@ module Axn
       # user-facing message.
       ADAPTER_FAILURE_MESSAGE = "The tool could not produce a valid response"
 
-      def result_to_mcp_response(result, text_content: :structured, reject_opaque_exposed_values: false)
+      # No `reject_opaque_exposed_values:` kwarg: `Axn::MCP.serialize_exposed` (from core's
+      # Axn::Tools::AdapterSerialization) resolves it per-tool off `result.__action__`'s own class, so
+      # there is nothing left for a caller to pass -- or to pass wrong. Resolving one class's override
+      # while rendering a different class's result is now structurally impossible.
+      def result_to_mcp_response(result, text_content: :structured)
         if result.ok?
-          exposed = Axn::Extensions::Serialization.render(result, reject_opaque: reject_opaque_exposed_values)
+          exposed = Axn::MCP.serialize_exposed(result)
           success_text = success_response_text(result, exposed, text_content)
           ::MCP::Tool::Response.new(
             [{ type: "text", text: success_text }],

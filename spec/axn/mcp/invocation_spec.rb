@@ -87,6 +87,77 @@ RSpec.describe Axn::MCP::Invocation do
       end
     end
 
+    describe "tool-call contract (dispatched via Axn::Tools::Invoker, PRO-3332)" do
+      # `perform` now runs the wrapped Axn through Axn::Tools::Invoker.new(adapter: :mcp,
+      # user_facing_input_errors: true, reject_undeclared_inputs: true) instead of a bare
+      # `axn_class.call` -- matching axn-ruby_llm's and axn-openapi's own profile for the established
+      # "LLM/model-facing tool" contract. Three behaviors that a bare `.call` never had:
+
+      it "coerces a wire-typed input (a String) into the declared type -- always on, no coerce: needed" do
+        coercing_axn = Class.new do
+          include Axn
+
+          expects :n, type: Integer
+          exposes :doubled, type: Integer
+          def call = expose(doubled: n * 2)
+        end
+
+        response = described_class.perform(coercing_axn, { n: "21", server_context: {} }, text_content: :structured)
+
+        expect(response.error?).to be false
+        expect(JSON.parse(response.content.first[:text])["doubled"]).to eq(42)
+      end
+
+      it "surfaces an inbound-contract violation as a correctable, user-facing error rather than a generic on_exception page" do
+        typed_axn = Class.new do
+          include Axn
+
+          expects :n, type: Integer
+          exposes :doubled, type: Integer
+          def call = expose(doubled: n * 2)
+        end
+
+        reported = []
+        allow(Axn.config).to receive(:on_exception) { |e, **| reported << e }
+
+        response = described_class.perform(typed_axn, { n: "not-a-number", server_context: {} }, text_content: :structured)
+
+        expect(response.error?).to be true
+        # Exact string, not a loose matcher: a broad /n/i (or similar) would also match the
+        # pre-migration generic "Something went wrong" response, so it wouldn't actually catch a
+        # regression back to that behavior. Per AGENTS.md: pin exact user-facing strings.
+        expect(response.content.first[:text]).to eq("N could not be coerced to a Integer")
+        expect(reported).to be_empty # user-facing, per Invoker docs -- not paged as a dev-facing bug
+      end
+
+      it "rejects a top-level input the tool never declared, instead of silently dropping it" do
+        no_input_axn = Class.new do
+          include Axn
+
+          exposes :done, type: :boolean
+          def call = expose(done: true)
+        end
+
+        response = described_class.perform(no_input_axn, { unexpected: "value", server_context: {} }, text_content: :structured)
+
+        expect(response.error?).to be true
+        expect(response.content.first[:text]).to eq("unknown input: unexpected")
+      end
+
+      it "stamps the call tree with the :mcp invoked_via dimension (adapter: :mcp)" do
+        stamped_axn = Class.new do
+          include Axn
+
+          exposes :stamp, optional: true
+          def call = expose(stamp: Axn::Internal::CurrentEntryPoint.current)
+        end
+
+        response = described_class.perform(stamped_axn, { server_context: {} }, text_content: :structured)
+
+        expect(JSON.parse(response.content.first[:text])["stamp"]).to eq("mcp")
+      end
+    end
+
     describe "transport-failure guard (upholds axn's non-bang never-raises at the adapter boundary)" do
       # Exposes a value with no honest JSON form, so serialization raises AFTER the Axn already
       # succeeded -- in the transport layer, outside core's executor (the gap core's own on_exception
@@ -149,10 +220,16 @@ RSpec.describe Axn::MCP::Invocation do
       # axn-openapi's dispatcher hint spec: named because reject_opaque_exposed_values is overridable, so a
       # hint naming only the gem-wide setter is a dead end whenever a per-tool override is what's in effect.
       describe "the opaque-rejection log hint" do
+        # Set gem-wide rather than passed to `perform`: `reject_opaque_exposed_values` is no longer a
+        # kwarg anywhere on this path -- `Axn::MCP.serialize_exposed` resolves it per-tool, and the hint
+        # below re-resolves it the same way -- so config IS the only way to turn it on now.
+        after { Axn::MCP.reset_config! }
+
         def captured_log_for(axn_class, reject_opaque_exposed_values:)
+          Axn::MCP.config.reject_opaque_exposed_values = reject_opaque_exposed_values
           io = StringIO.new
           allow(Axn.config).to receive(:logger).and_return(Logger.new(io))
-          described_class.perform(axn_class, {}, text_content: :structured, reject_opaque_exposed_values:)
+          described_class.perform(axn_class, {}, text_content: :structured)
           io.string
         end
 

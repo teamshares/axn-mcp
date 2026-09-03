@@ -33,6 +33,6 @@ Gem::Specification.new do |spec|
   spec.executables = spec.files.grep(%r{\Aexe/}) { |f| File.basename(f) }
   spec.require_paths = ["lib"]
 
-  spec.add_dependency "axn", ">= 0.1.0-alpha.5", "< 0.2.0"
+  spec.add_dependency "axn", ">= 0.1.0-alpha.6", "< 0.2.0"
   spec.add_dependency "mcp", ">= 0.5.0", "< 2.0"
 end

@@ -212,6 +212,43 @@ MCP::Server.new(
 `server_context` flows identically to both: native tools read it in `call(args, server_context:)`;
 wrapped Axns get it spread into `ambient_context` (see [Server Context](#server-context)).
 
+## Tool call contract
+
+A wrapped Axn's `.call` doesn't dispatch to the plain `axn_class.call` a direct in-process caller
+gets — it runs through axn core's [`Axn::Tools::Invoker`](https://teamshares.github.io/axn/reference/tool-invoker),
+the sanctioned path for treating model-supplied arguments as untrusted wire data. This applies to
+every wrapped tool call, with no opt-out:
+
+- **Input types are always coerced.** An `expects` field with a coercible `type:` (`Date`,
+  `DateTime`, `Time`, `Symbol`, `Integer`, `Float`, `:boolean`) accepts a wire-typed String and
+  converts it before validation runs — `expects :limit, type: Integer` already accepts `"25"`, with
+  no separate `coerce:` needed. `coerce:`/`type: { coerce: true }` still exist (see below), and a
+  field can explicitly opt **out** with `type: { klass: Integer, coerce: false }` if you need this
+  particular field to reject a wire string rather than convert it.
+- **A bad or missing argument surfaces as a specific, correctable client error** — not axn's generic
+  `"Something went wrong"` — and is **not** reported through `on_exception` (a model sending a
+  malformed argument isn't a bug in your code):
+
+  ```ruby
+  expects :limit, type: Integer
+  # missing entirely  -> result.error == "Limit is not a Integer"
+  # limit: "abc"       -> result.error == "Limit could not be coerced to a Integer"
+  ```
+
+- **An argument the tool never declared with `expects` is rejected**, rather than silently dropped:
+  `extra: "value"` on a tool with no such field -> `result.error == "unknown input: extra"`.
+
+None of this touches `exposes`/output serialization, `ambient_context` resolution (still
+adapter-injected and guarded against a model-supplied override — see
+[Server Context](#server-context)), or a direct, unwrapped `TheAxn.call(...)` — a direct call keeps
+whatever `coerce_input_types`/undeclared-key behavior it already had. `wrap`'s never-raises contract
+(above) still governs the transport step *after* this — `result.error` still flows through
+`Serializer`/`guard_tool_response` exactly as any other failure does.
+
+Every wrapped call is also stamped with the `invoked_via: "mcp"` dimension for its whole call tree
+(visible in axn's own call-completion log line, and to any tracing/dashboard code keyed off it), so
+MCP-driven traffic is distinguishable from a direct `.call` with no extra work on your part.
+
 ## Field declarations & schema
 
 The schema mappings below are axn core reflection surfaced through `wrap` — declare fields on a
@@ -262,7 +299,6 @@ exposes :results,    type: Array,                description: "Matching records"
 
 Axn types map to JSON Schema types:
 
-
 | Ruby Type          | JSON Schema                    |
 | ------------------ | ------------------------------ |
 | `String`           | `string`                       |
@@ -277,15 +313,14 @@ Axn types map to JSON Schema types:
 
 ### Coercing loosely-typed inbound values with `coerce:`
 
-An LLM (or a client that stringifies its JSON) doesn't always send a value in the exact Ruby type your `expects` field declares — a `Date`/`Integer`/`Float`/`Symbol`/`Time`/`DateTime` field can arrive as a `String`. Add the `coerce: <Type>` shorthand (or `type: { klass: <Type>, coerce: true }` when you also need other type options alongside it — `coerce:` can't be combined with a sibling top-level `type:`) to have `axn` core convert a well-formed string to the declared type *before* validation runs:
+An LLM (or a client that stringifies its JSON) doesn't always send a value in the exact Ruby type your `expects` field declares — a `Date`/`Integer`/`Float`/`Symbol`/`Time`/`DateTime` field can arrive as a `String`. **Through a wrapped tool call this already happens automatically** — see [Tool call contract](#tool-call-contract) above; `expects :count, type: Integer` alone accepts `"42"`. `coerce:`/`type: { coerce: true }` below matters for a *direct*, unwrapped `TheAxn.call(...)` (which doesn't get the Invoker's coercion), or to force coercion **on** a field even outside a tool call. Add the `coerce: <Type>` shorthand (or `type: { klass: <Type>, coerce: true }` when you also need other type options alongside it — `coerce:` can't be combined with a sibling top-level `type:`) to have `axn` core convert a well-formed string to the declared type *before* validation runs:
 
 ```ruby
 expects :starts_on, coerce: Date                          # "2026-01-15" -> a Date
 expects :count,     type: { klass: Integer, coerce: true } # "42" -> 42
 ```
 
-Coercion applies to inbound `expects` fields — top-level **and** subfields declared with `on:` (including ambient ones, e.g. a value spread from the MCP server context). It is **not** available on `exposes` (outbound values are serialized, not coerced) or on `shape:` block members (a shape member only constrains its parent's structure and has no reader of its own for a coerced value to resolve onto — coercion is a read-path transform) — both *raise at class-definition* if given `coerce:`. Only a non-blank `String` is converted. An unparseable string doesn't silently fall through to a generic type-mismatch: coercion raises `Axn::InboundValidationError` carrying a specific `"<field> could not be coerced to a <Type>"` message — but, like any validation failure, that detail rides on the exception (logs / `on_exception`), while the tool's response to the client carries axn's user-facing `result.error` (`"Something went wrong"` by default, or the tool's own base `error "…"` — see [Error Handling](#error-handling)). `inputSchema`/`outputSchema` output is identical with or without `coerce:` — only accepted inbound values change, not the field's advertised JSON type.
-
+Coercion applies to inbound `expects` fields — top-level **and** subfields declared with `on:` (including ambient ones, e.g. a value spread from the MCP server context). It is **not** available on `exposes` (outbound values are serialized, not coerced) or on `shape:` block members (a shape member only constrains its parent's structure and has no reader of its own for a coerced value to resolve onto — coercion is a read-path transform) — both *raise at class-definition* if given `coerce:`. Only a non-blank `String` is converted. An unparseable string doesn't silently fall through to a generic type-mismatch: coercion raises `Axn::InboundValidationError` carrying a specific `"<field> could not be coerced to a <Type>"` message. **Through a wrapped tool call**, that specific message *is* `result.error` (e.g. `"Limit could not be coerced to a Integer"`, combined with the tool's own base `error "…"` if it has one), and it is **not** reported to `on_exception` — see [Tool call contract](#tool-call-contract). On a *direct*, unwrapped call, it stays dev-facing as any inbound violation always has: the detail rides on the exception (logs / `on_exception`), and the caller sees axn's generic `result.error` (`"Something went wrong"` by default, or the tool's own base `error "…"`). `inputSchema`/`outputSchema` output is identical with or without `coerce:` — only accepted inbound values change, not the field's advertised JSON type.
 
 ### Typed member contracts with `shape:`
 
@@ -594,7 +629,8 @@ The MCP error response carries the Axn's own `result.error` — the gem imposes 
 | Failure                                  | Text shown to the LLM   |
 | ----------------------------------------- | ----------------------- |
 | `fail! "User not found"`                  | `"User not found"`      |
-| Bare `fail!`, a validation error, or an unhandled exception | `"Something went wrong"` (axn's generic default) |
+| An `expects` (inbound argument) violation — missing, wrong-type, undeclared | The specific violation, e.g. `"Limit is not a Integer"`, `"unknown input: extra"` — see [Tool call contract](#tool-call-contract). Not reported to `on_exception`. |
+| Bare `fail!`, an `ambient_context`/`exposes` (outbound) violation, or an unhandled exception | `"Something went wrong"` (axn's generic default). Reported to `on_exception`. |
 
 Want a friendlier generic message than `"Something went wrong"`? Declare your own base `error "..."`
 on the Axn (standard axn practice) — it's per-tool, so each tool can say something specific:
@@ -697,7 +733,7 @@ because an Axn's model is typed structured I/O:
 ## Requirements
 
 - Ruby >= 3.2.1
-- [axn](https://github.com/teamshares/axn) >= 0.1.0-alpha.5, < 0.2.0
+- [axn](https://github.com/teamshares/axn) >= 0.1.0-alpha.6, < 0.2.0
 - [mcp](https://github.com/modelcontextprotocol/ruby-sdk) >= 0.5.0, < 2.0 — the floor is `0.5.0`, the first SDK version with the `icons` setter (and full JSON-Schema tool-schema handling, so conditional `allOf` constraints survive). Across that range the SDK varies in `server_context` shape (see [Server Context](#server-context)) and in how it surfaces a mid-serialization raise (a top-level JSON-RPC error vs. an `isError` tool result); this gem is written to be correct across all of it, not just the version you happen to have installed locally. The upper bound tracks the SDK's own semver: `1.0` declared its public API stable (breaking changes only in a future major), so `1.x` is in range.
 
 ## Development

@@ -493,7 +493,7 @@ RSpec.describe "MCP Server Integration", type: :integration do
         present_as: :message,
       )
 
-      response = message_tool.call(value: 10, server_context: {})
+      response = message_tool.call(server_context: {})
 
       expect(response).to be_a(MCP::Tool::Response)
       expect(response.content.first[:text]).to eq("Returned message")

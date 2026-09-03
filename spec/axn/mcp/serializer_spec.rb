@@ -80,6 +80,8 @@ RSpec.describe Axn::MCP::Serializer do
     end
 
     context "with an opaque exposed value (one with no author-declared JSON rendering)" do
+      after { Axn::MCP.reset_config! }
+
       let(:opaque_tool) do
         Class.new do
           include Axn
@@ -99,11 +101,15 @@ RSpec.describe Axn::MCP::Serializer do
         expect(response.structured_content["obj"]).to match(/\A#<Object:0x/)
       end
 
-      it "raises Axn::Extensions::Serialization::UnserializableValue when reject_opaque_exposed_values: true" do
+      # Turned on via config, not a kwarg: `result_to_mcp_response` no longer takes one. It renders
+      # through `Axn::MCP.serialize_exposed`, which resolves the setting per-tool off the result's own
+      # action class -- so the gem-wide config (with no per-class override) is what reaches it here.
+      it "raises Axn::Extensions::Serialization::UnserializableValue when reject_opaque_exposed_values is on" do
+        Axn::MCP.config.reject_opaque_exposed_values = true
         result = opaque_tool.call
 
         expect do
-          described_class.result_to_mcp_response(result, text_content: :structured, reject_opaque_exposed_values: true)
+          described_class.result_to_mcp_response(result, text_content: :structured)
         end.to raise_error(Axn::Extensions::Serialization::UnserializableValue, /obj/)
       end
     end
