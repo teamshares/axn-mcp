@@ -299,7 +299,6 @@ exposes :results,    type: Array,                description: "Matching records"
 
 Axn types map to JSON Schema types:
 
-
 | Ruby Type          | JSON Schema                    |
 | ------------------ | ------------------------------ |
 | `String`           | `string`                       |
@@ -322,7 +321,6 @@ expects :count,     type: { klass: Integer, coerce: true } # "42" -> 42
 ```
 
 Coercion applies to inbound `expects` fields — top-level **and** subfields declared with `on:` (including ambient ones, e.g. a value spread from the MCP server context). It is **not** available on `exposes` (outbound values are serialized, not coerced) or on `shape:` block members (a shape member only constrains its parent's structure and has no reader of its own for a coerced value to resolve onto — coercion is a read-path transform) — both *raise at class-definition* if given `coerce:`. Only a non-blank `String` is converted. An unparseable string doesn't silently fall through to a generic type-mismatch: coercion raises `Axn::InboundValidationError` carrying a specific `"<field> could not be coerced to a <Type>"` message. **Through a wrapped tool call**, that specific message *is* `result.error` (e.g. `"Limit could not be coerced to a Integer"`, combined with the tool's own base `error "…"` if it has one), and it is **not** reported to `on_exception` — see [Tool call contract](#tool-call-contract). On a *direct*, unwrapped call, it stays dev-facing as any inbound violation always has: the detail rides on the exception (logs / `on_exception`), and the caller sees axn's generic `result.error` (`"Something went wrong"` by default, or the tool's own base `error "…"`). `inputSchema`/`outputSchema` output is identical with or without `coerce:` — only accepted inbound values change, not the field's advertised JSON type.
-
 
 ### Typed member contracts with `shape:`
 
