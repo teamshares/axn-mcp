@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- With an axn release that reports `input_schema_residues`, a tool's `inputSchema` carries axn core's residue prose in each property's `description` (the constraints the runtime enforces that JSON Schema cannot state). This gem adds none of its own: `tools/list` returns core's `input_schema` unchanged apart from the `$schema` dialect URI the MCP SDK prepends, and a spec now pins that.
+
 ## 0.2.2
 
 ### Changed
