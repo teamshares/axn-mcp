@@ -8,6 +8,9 @@ RSpec.describe "Axn::MCP.wrap schema reflection" do
     Axn::MCP.wrap(axn, name: "probe", description: "probe")
   end
 
+  # Core appends what JSON Schema cannot state to the property's description, after this preface.
+  let(:residue_preface) { "Additional constraints apply that JSON Schema cannot express: " }
+
   describe "retired Axn::MCP::Tool base" do
     it "raises when subclassing the retired base" do
       expect { Class.new(Axn::MCP::Tool) }.to raise_error(NotImplementedError, /retired/i)
@@ -117,11 +120,13 @@ RSpec.describe "Axn::MCP.wrap schema reflection" do
         expect(properties[:count][:type]).to eq("integer")
       end
 
-      it "falls back to string for unknown types on input" do
+      # A class with no JSON counterpart is left untyped, and core names the runtime type check in the description.
+      it "leaves an unknown type untyped and names its check in the description" do
         custom_class = Class.new
         tool = wrapped { expects :custom, type: custom_class }
         properties = tool.input_schema_value.to_h[:properties]
-        expect(properties[:custom][:type]).to eq("string")
+        expect(properties[:custom]).not_to have_key(:type)
+        expect(properties[:custom][:description]).to start_with("#{residue_preface}JSON Schema cannot express this check")
       end
     end
 
@@ -248,16 +253,21 @@ RSpec.describe "Axn::MCP.wrap schema reflection" do
         expect(properties[:user_id][:not]).to eq({ type: "null" })
       end
 
+      # A model id passes only when its lookup finds a record, which core states after the description.
+      let(:model_lookup_residue) do
+        "#{residue_preface}the id must name a record the model lookup finds; one it does not find is rejected."
+      end
+
       it "auto-generates description for model field" do
         tool = wrapped { expects :user, model: true }
         properties = tool.input_schema_value.to_h[:properties]
-        expect(properties[:user_id][:description]).to eq("ID of the User record")
+        expect(properties[:user_id][:description]).to eq("ID of the User record. #{model_lookup_residue}")
       end
 
       it "allows custom description to override auto-generated" do
         tool = wrapped { expects :user, model: true, description: "The target user's ID" }
         properties = tool.input_schema_value.to_h[:properties]
-        expect(properties[:user_id][:description]).to eq("The target user's ID")
+        expect(properties[:user_id][:description]).to eq("The target user's ID. #{model_lookup_residue}")
       end
 
       it "marks model id field as required when model field is required" do
@@ -301,23 +311,24 @@ RSpec.describe "Axn::MCP.wrap schema reflection" do
       end
     end
 
+    # An untyped numericality: field also accepts the value's string form, so core admits a numeric string too.
     describe "numericality validation" do
-      it "infers integer from numericality with only_integer" do
+      it "admits an integer or an integer string for numericality with only_integer" do
         tool = wrapped { expects :count, numericality: { only_integer: true } }
         properties = tool.input_schema_value.to_h[:properties]
-        expect(properties[:count][:type]).to eq("integer")
+        expect(properties[:count][:anyOf]).to eq([{ type: "integer" }, { type: "string", pattern: "^[+-]?\\d+$", minLength: 1 }])
       end
 
-      it "infers number from numericality without only_integer" do
+      it "admits a number or a string for numericality without only_integer" do
         tool = wrapped { expects :amount, numericality: true }
         properties = tool.input_schema_value.to_h[:properties]
-        expect(properties[:amount][:type]).to eq("number")
+        expect(properties[:amount][:anyOf]).to eq([{ type: "number" }, { type: "string", minLength: 1 }])
       end
 
-      it "infers number from numericality hash without only_integer" do
+      it "admits a bounded number or a string for a numericality hash without only_integer" do
         tool = wrapped { expects :value, numericality: { greater_than: 0 } }
         properties = tool.input_schema_value.to_h[:properties]
-        expect(properties[:value][:type]).to eq("number")
+        expect(properties[:value][:anyOf]).to eq([{ type: "number", exclusiveMinimum: 0 }, { type: "string", minLength: 1 }])
       end
     end
 
@@ -351,7 +362,12 @@ RSpec.describe "Axn::MCP.wrap schema reflection" do
       {
         String => { type: "string" },
         Integer => { type: "integer" },
-        Float => { type: "number" },
+        # A JSON number can arrive as an Integer, which a Float check rejects, so core names that check.
+        Float => {
+          type: "number",
+          description: "Additional constraints apply that JSON Schema cannot express: the runtime checks for a Ruby Float, " \
+                       "and a JSON number arrives as an Integer (1) or a Float (1.5).",
+        },
         Numeric => { type: "number" },
       }.each do |ruby_type, expected_items|
         it "emits items #{expected_items.inspect} for of: #{ruby_type}" do
