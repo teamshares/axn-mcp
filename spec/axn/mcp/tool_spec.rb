@@ -253,9 +253,11 @@ RSpec.describe "Axn::MCP.wrap schema reflection" do
         expect(properties[:user_id][:not]).to eq({ type: "null" })
       end
 
-      # A model id passes only when its lookup finds a record, which core states after the description.
+      # A model id passes only when its lookup finds a record, and the record reader itself (`user`) is
+      # not the wire argument; core states both after the description.
       let(:model_lookup_residue) do
-        "#{residue_preface}the id must name a record the model lookup finds; one it does not find is rejected."
+        "#{residue_preface}the id must name a record the model lookup finds; one it does not find is rejected; " \
+          "don't send `user` itself, which is read as the record and rejected unless it is blank; send this id."
       end
 
       it "auto-generates description for model field" do

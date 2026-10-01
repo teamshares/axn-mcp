@@ -13,11 +13,6 @@ inherit_gem:
 # re-declare inherit_mode or a vendor exclude here (and, being pure Ruby, no nested
 # spec_rails/dummy_app bundle to exclude either).
 
-# Matches the gemspec's required_ruby_version floor. axn's shared config (at the pinned ref) still
-# targets 3.2; drop this once the axn pin moves to a ref whose .rubocop.yml targets 3.3.
-AllCops:
-  TargetRubyVersion: 3.3
-
 # Standard for hyphenated gem names — axn's shared config does not configure Naming/FileName.
 Naming/FileName:
   Exclude:
