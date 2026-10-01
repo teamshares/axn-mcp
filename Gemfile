@@ -13,4 +13,4 @@ gem "rubocop", "~> 1.21"
 # unreleased (main still reports 0.1.0-alpha.6.1, a version string RubyGems already has without it).
 # Pinned by ref because Gemfile.lock is gitignored. Before cutting a version of this gem: raise the
 # gemspec axn floor to the release that ships residues and drop this pin.
-gem "axn", git: "https://github.com/teamshares/axn", ref: "03061ae78b7baae3c8af4ec15a3f0c0aca7e1618"
+gem "axn", git: "https://github.com/teamshares/axn", ref: "9e2a143d302c7801b8f0b13578fc8540705a3998"
