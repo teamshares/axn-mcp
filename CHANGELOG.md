@@ -4,6 +4,7 @@
 
 ### Changed
 
+- **BREAKING: requires Ruby >= 3.3** (was >= 3.2.1; Ruby 3.2 is end-of-life). CI now runs Ruby 3.3, 3.4 and 4.0.
 - With an axn release that reports `input_schema_residues`, a tool's `inputSchema` carries axn core's residue prose in each property's `description` (the constraints the runtime enforces that JSON Schema cannot state). This gem adds none of its own: `tools/list` returns core's `input_schema` unchanged apart from the `$schema` dialect URI the MCP SDK prepends, and a spec now pins that.
 
 ## 0.2.2
